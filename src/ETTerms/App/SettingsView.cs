@@ -107,23 +107,31 @@ public sealed class SettingsView : UserControl
         shellType.Text = s.ShellType;
         flow.Controls.Add(MakeRow("Terminal Shell", shellType));
 
-        var shellDir = new TextBox { Width = 160, BackColor = Theme.TabBack, ForeColor = Theme.Text, Font = Theme.UiFont, Text = s.ShellStartupDir, BorderStyle = BorderStyle.FixedSingle };
+        // 用一個帶邊框的容器包住「輸入框 + 瀏覽鈕」，讓兩者看起來像同一個欄位
+        var dirPanel = new Panel { Width = InputWidth, Height = 24, BackColor = Theme.TabBack, BorderStyle = BorderStyle.FixedSingle };
+        var shellDir = new TextBox { BackColor = Theme.TabBack, ForeColor = Theme.Text, Font = Theme.UiFont, Text = s.ShellStartupDir, BorderStyle = BorderStyle.None };
         var browseBtn = new Button
         {
-            Text = "📁", Width = 30, Height = 22, FlatStyle = FlatStyle.Flat,
-            ForeColor = Theme.Text, BackColor = Theme.TabBack, Font = Theme.UiFont, Cursor = Cursors.Hand
+            Text = "…", Width = 26, FlatStyle = FlatStyle.Flat,
+            ForeColor = Theme.TextDim, BackColor = Theme.TabBack, Font = Theme.UiFont, Cursor = Cursors.Hand
         };
-        browseBtn.FlatAppearance.BorderColor = Theme.Border;
+        // 無邊框、暗色文字、與輸入框同底色 → 不再突兀
+        browseBtn.FlatAppearance.BorderSize = 0;
+        browseBtn.FlatAppearance.MouseOverBackColor = Theme.Hover;
         browseBtn.Click += (_, _) =>
         {
             using var dlg = new FolderBrowserDialog { SelectedPath = shellDir.Text };
             if (dlg.ShowDialog(this) == DialogResult.OK) shellDir.Text = dlg.SelectedPath;
         };
-        var dirPanel = new Panel { Width = 200, Height = 24 };
+        // 文字框置中於容器、瀏覽鈕貼右
         shellDir.Dock = DockStyle.Fill;
+        shellDir.Margin = new Padding(0);
         browseBtn.Dock = DockStyle.Right;
-        dirPanel.Controls.Add(shellDir);
+        var dirInner = new Panel { Dock = DockStyle.Fill, BackColor = Theme.TabBack, Padding = new Padding(4, 3, 0, 0) };
+        dirInner.Controls.Add(shellDir);
+        // 先加靠右的按鈕、再加 Fill 容器，避免 Fill 蓋到按鈕下方
         dirPanel.Controls.Add(browseBtn);
+        dirPanel.Controls.Add(dirInner);
         flow.Controls.Add(MakeRow("Startup Directory", dirPanel));
         flow.Controls.Add(MakeSpacer(12));
 
@@ -268,12 +276,25 @@ public sealed class SettingsView : UserControl
     }
 
     // ── Helpers ──
+    private const int LabelWidth = 150;   // 標籤欄固定寬度
+    private const int InputWidth = 200;   // 所有輸入框統一寬度
+
     private static Panel MakeRow(string label, Control control)
     {
-        var row = new Panel { Width = 400, Height = 34, Margin = new Padding(0, 4, 0, 4) };
-        control.Dock = DockStyle.Right;
+        var row = new Panel { Width = LabelWidth + InputWidth, Height = 32, Margin = new Padding(0, 3, 0, 3) };
+
+        // 統一輸入框寬度 + 左緣對齊（不再 Dock.Right，避免右對齊造成左緣參差）
+        control.Width = InputWidth;
+        int top = (row.Height - control.Height) / 2;
+        control.Location = new Point(LabelWidth, top < 0 ? 0 : top);
+
         row.Controls.Add(control);
-        row.Controls.Add(new Label { Text = label, Dock = DockStyle.Left, Width = 160, ForeColor = Theme.Text, Font = Theme.UiFont, TextAlign = ContentAlignment.MiddleLeft });
+        row.Controls.Add(new Label
+        {
+            Text = label, AutoSize = false, Width = LabelWidth, Height = row.Height,
+            Location = new Point(0, 0), ForeColor = Theme.Text, Font = Theme.UiFont,
+            TextAlign = ContentAlignment.MiddleLeft
+        });
         return row;
     }
 

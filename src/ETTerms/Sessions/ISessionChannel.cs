@@ -9,6 +9,12 @@ public interface ISessionChannel : IDisposable
     /// <summary>收到遠端資料（背景執行緒觸發，訂閱者需自行 Invoke 回 UI thread）。</summary>
     event Action<byte[]>? DataReceived;
 
+    /// <summary>
+    /// 用於 log 檔名的連線識別字串：
+    /// Shell → "PowerShell"；Serial → "COM17"；SSH → "etwen@192.168.1.50"。
+    /// </summary>
+    string LogName { get; }
+
     /// <summary>建立連線；失敗丟例外。</summary>
     void Open();
 

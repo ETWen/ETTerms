@@ -23,6 +23,8 @@ public sealed class SshChannel : ISessionChannel
 
     public event Action<byte[]>? DataReceived;
 
+    public string LogName => $"{_ssh.Username}@{_ssh.Host}";
+
     public SshChannel(Connection conn)
     {
         _ssh = conn.Ssh ?? new SshSettings();

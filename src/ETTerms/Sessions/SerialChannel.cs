@@ -15,6 +15,8 @@ public sealed class SerialChannel : ISessionChannel
 
     public event Action<byte[]>? DataReceived;
 
+    public string LogName => _portName;
+
     public SerialChannel(SerialSettings s)
     {
         _portName = s.PortName;

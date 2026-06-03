@@ -21,8 +21,9 @@ public sealed class SessionPage : UserControl
     private readonly TerminalView _term;
     private readonly ScriptRunner _runner = new();
     private readonly Label _status;
-    private readonly Button _run, _stop;
+    private readonly Button _run, _stop, _log;
     private bool _started;
+    private SessionLogger? _logger;
 
     /// <summary>底層連線通道。</summary>
     public ISessionChannel Channel => _channel;
@@ -78,9 +79,12 @@ public sealed class SessionPage : UserControl
         _run = MakeBarButton("▶ Script", OnRunScript);
         _stop = MakeBarButton("■ Stop", (_, _) => _runner.Cancel());
         _stop.Enabled = false;
+        _log = MakeBarButton("⏺ Log", OnToggleLog);
+        _log.Width = 92;            // 容納 "⏺ Logging" 不被截字
         bar.Controls.Add(_status);  // Fill 先加
-        bar.Controls.Add(_run);     // Right
-        bar.Controls.Add(_stop);    // Right
+        bar.Controls.Add(_log);     // Right（最左：Log）
+        bar.Controls.Add(_run);     // Right（中：Script）
+        bar.Controls.Add(_stop);    // Right（最右：Stop）
 
         _term = new TerminalView(new TerminalProfile()) { Dock = DockStyle.Fill };
         _term.SendData += data => _channel.Write(data);
@@ -111,6 +115,56 @@ public sealed class SessionPage : UserControl
         }
         SetRunning(true);
         await _runner.RunAsync(content, name, _channel);
+    }
+
+    /// <summary>此分頁是否正在側錄。</summary>
+    public bool IsLogging => _logger != null;
+
+    /// <summary>開始側錄（供 Log All 批次呼叫）。成功或已在側錄回傳 true。</summary>
+    public bool StartLog()
+    {
+        if (_logger != null) return true;
+        try
+        {
+            _logger = SessionLogger.Start(_channel.LogName);
+            UpdateLogButton();
+            AppLogger.Info($"Session log started: {_logger.FilePath}");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.LogError("Start session log failed", ex);
+            return false;
+        }
+    }
+
+    /// <summary>停止側錄並收尾關檔。</summary>
+    public void StopLog()
+    {
+        if (_logger == null) return;
+        string path = _logger.FilePath;
+        _logger.Dispose();
+        _logger = null;
+        UpdateLogButton();
+        AppLogger.Info($"Session log stopped: {path}");
+    }
+
+    private void OnToggleLog(object? sender, EventArgs e)
+    {
+        if (_logger == null)
+        {
+            if (!StartLog())
+                MessageBox.Show(this, "Failed to start log. See app log for details.", "Log", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+        else StopLog();
+    }
+
+    private void UpdateLogButton()
+    {
+        bool on = _logger != null;
+        _log.Text = on ? "⏺ Logging" : "⏺ Log";
+        _log.ForeColor = on ? Theme.SerialColor : Theme.Text;
+        _log.FlatAppearance.BorderColor = on ? Theme.SerialColor : Theme.Border;
     }
 
     private static bool ContainsGroupCommands(string content)
@@ -172,6 +226,8 @@ public sealed class SessionPage : UserControl
 
     private void OnDataReceived(byte[] data)
     {
+        // 側錄不依賴 UI thread，直接在背景緒寫檔（SessionLogger 內部自鎖）。
+        _logger?.Write(data);
         if (IsDisposed || !IsHandleCreated) return;
         if (InvokeRequired) BeginInvoke(() => _term.Feed(data));
         else _term.Feed(data);
@@ -183,6 +239,8 @@ public sealed class SessionPage : UserControl
         {
             _runner.Cancel();
             _channel.DataReceived -= OnDataReceived;
+            _logger?.Dispose();
+            _logger = null;
             SessionManager.Unregister(_channel);
             _channel.Dispose();
         }

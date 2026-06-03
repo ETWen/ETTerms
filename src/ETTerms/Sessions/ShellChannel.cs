@@ -24,6 +24,8 @@ public sealed class ShellChannel : ISessionChannel
 
     public event Action<byte[]>? DataReceived;
 
+    public string LogName => _settings.ShellType;
+
     public ShellChannel(ShellSettings settings) => _settings = settings;
 
     public void Open()

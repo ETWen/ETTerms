@@ -23,6 +23,7 @@ public sealed class WorkspaceView : UserControl
     }
 
     private readonly FlowLayoutPanel _toolbar;
+    private readonly Button _logAll;
     private readonly Panel _tabStrip;
     private readonly Panel _body;
     private readonly Label _empty;
@@ -31,6 +32,12 @@ public sealed class WorkspaceView : UserControl
     private Session? _active;
     private int _rows = 1, _cols = 1;
     private Session? _hoverTab;
+
+    // 拖曳排序狀態
+    private Session? _dragTab;     // 按住中的分頁（候選拖曳對象）
+    private int _dragStartX;       // 按下時的滑鼠 X，用來判斷是否超過拖曳門檻
+    private bool _dragging;        // 是否已進入拖曳
+    private const int DragThreshold = 5;
 
     private const int StripH = 30;
     private const int TabW = 180;
@@ -44,9 +51,12 @@ public sealed class WorkspaceView : UserControl
         Dock = DockStyle.Fill;
         BackColor = Theme.WorkspaceBack;
 
+        // 頂部工具列容器：左側為 Layout/Run 群組（Fill），右側為 Log All（Dock Right）
+        var topBar = new Panel { Dock = DockStyle.Top, Height = 38, BackColor = Theme.RailBack };
+
         _toolbar = new FlowLayoutPanel
         {
-            Dock = DockStyle.Top, Height = 38, BackColor = Theme.RailBack,
+            Dock = DockStyle.Fill, BackColor = Theme.RailBack,
             Padding = new Padding(8, 6, 8, 6), WrapContents = false
         };
         _toolbar.Controls.Add(new Label
@@ -62,11 +72,24 @@ public sealed class WorkspaceView : UserControl
         _toolbar.Controls.Add(MakeActionButton("▶ Group2", 90, 4, (_, _) => OnRunGroup(2)));
         _toolbar.Controls.Add(MakeActionButton("▶ Group3", 90, 4, (_, _) => OnRunGroup(3)));
 
+        // ── 右上角：Log All（一次開/關所有分頁側錄）──
+        var rightBar = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Right, AutoSize = true, BackColor = Theme.RailBack,
+            Padding = new Padding(0, 6, 8, 6), WrapContents = false
+        };
+        _logAll = MakeActionButton("⏺ Log All", 96, 0, OnToggleLogAll);
+        rightBar.Controls.Add(_logAll);
+
+        topBar.Controls.Add(_toolbar);  // Fill（先加 → 後 dock → 吃剩餘空間）
+        topBar.Controls.Add(rightBar);  // Right（後加 → 先 dock → 佔右側）
+
         _tabStrip = new Panel { Dock = DockStyle.Top, Height = StripH, BackColor = Theme.RailBack };
         _tabStrip.Paint += OnStripPaint;
         _tabStrip.MouseDown += OnStripMouseDown;
         _tabStrip.MouseMove += OnStripMouseMove;
-        _tabStrip.MouseLeave += (_, _) => { _hoverTab = null; _tabStrip.Invalidate(); };
+        _tabStrip.MouseUp += OnStripMouseUp;
+        _tabStrip.MouseLeave += (_, _) => { if (!_dragging) { _hoverTab = null; _tabStrip.Invalidate(); } };
         SetDoubleBuffered(_tabStrip);
 
         _body = new Panel { Dock = DockStyle.Fill, BackColor = Theme.WorkspaceBack };
@@ -80,7 +103,7 @@ public sealed class WorkspaceView : UserControl
 
         Controls.Add(_body);        // Fill 先加
         Controls.Add(_tabStrip);    // Top
-        Controls.Add(_toolbar);     // Top（最上）
+        Controls.Add(topBar);       // Top（最上）
         _body.Controls.Add(_empty);
     }
 
@@ -251,7 +274,15 @@ public sealed class WorkspaceView : UserControl
         foreach (var s in _sessions)
         {
             if (s.CloseRect.Contains(e.Location)) { CloseSession(s); return; }
-            if (s.TabBounds.Contains(e.Location)) { _active = s; Relayout(); return; }
+            if (s.TabBounds.Contains(e.Location))
+            {
+                _active = s;
+                _dragTab = s;            // 記下候選拖曳對象，超過門檻才真的開始拖
+                _dragStartX = e.X;
+                _dragging = false;
+                Relayout();
+                return;
+            }
         }
     }
 
@@ -270,10 +301,45 @@ public sealed class WorkspaceView : UserControl
 
     private void OnStripMouseMove(object? sender, MouseEventArgs e)
     {
+        // 拖曳排序：按住某分頁並橫向移動，依滑鼠 X 即時換位
+        if (e.Button == MouseButtons.Left && _dragTab != null)
+        {
+            if (!_dragging && Math.Abs(e.X - _dragStartX) > DragThreshold)
+            {
+                _dragging = true;
+                _tabStrip.Cursor = Cursors.SizeWE;
+            }
+            if (_dragging)
+            {
+                int target = Math.Clamp(e.X / TabW, 0, _sessions.Count - 1);
+                int cur = _sessions.IndexOf(_dragTab);
+                if (cur >= 0 && target != cur)
+                {
+                    _sessions.RemoveAt(cur);
+                    _sessions.Insert(target, _dragTab);
+                    _tabStrip.Invalidate();
+                }
+            }
+            return;
+        }
+
         LayoutTabs();
         Session? ht = null;
         foreach (var s in _sessions) if (s.TabBounds.Contains(e.Location)) { ht = s; break; }
         if (ht != _hoverTab) { _hoverTab = ht; _tabStrip.Invalidate(); }
+    }
+
+    private void OnStripMouseUp(object? sender, MouseEventArgs e)
+    {
+        bool reordered = _dragging;
+        _dragTab = null;
+        _dragging = false;
+        _tabStrip.Cursor = Cursors.Default;
+        if (reordered)
+        {
+            RefreshGroupLabels();   // Group 內編號（A/B/C…）依新順序更新
+            Relayout();             // 重鋪格子，讓 layout 位置跟著新分頁順序
+        }
     }
 
     private void OnStripPaint(object? sender, PaintEventArgs e)
@@ -284,11 +350,15 @@ public sealed class WorkspaceView : UserControl
         foreach (var s in _sessions)
         {
             bool active = s == _active, hover = s == _hoverTab;
-            using (var b = new SolidBrush(active ? Theme.TabActiveBack : hover ? Theme.Hover : Theme.TabBack))
+            bool drag = _dragging && s == _dragTab;
+            using (var b = new SolidBrush(drag ? Theme.Hover : active ? Theme.TabActiveBack : hover ? Theme.Hover : Theme.TabBack))
                 g.FillRectangle(b, s.TabBounds);
             if (active)
                 using (var bar = new SolidBrush(Theme.Accent))
                     g.FillRectangle(bar, new Rectangle(s.TabBounds.Left, s.TabBounds.Bottom - 2, s.TabBounds.Width, 2));
+            if (drag)
+                using (var pen = new Pen(Theme.Accent, 1))
+                    g.DrawRectangle(pen, new Rectangle(s.TabBounds.Left, s.TabBounds.Top, s.TabBounds.Width - 1, s.TabBounds.Height - 1));
             using (var dot = new SolidBrush(s.IsSsh ? Theme.SshColor : Theme.SerialColor))
                 g.FillEllipse(dot, s.TabBounds.Left + 9, StripH / 2 - 4, 8, 8);
             var tr = new Rectangle(s.TabBounds.Left + 22, s.TabBounds.Top, s.TabBounds.Width - 22 - CloseSz - 10, StripH);
@@ -326,6 +396,41 @@ public sealed class WorkspaceView : UserControl
         b.FlatAppearance.MouseOverBackColor = Theme.Hover;
         b.Click += onClick;
         return b;
+    }
+
+    // ── Log All（一次開/關所有分頁側錄） ──────────────────────
+    private void OnToggleLogAll(object? sender, EventArgs e)
+    {
+        if (_sessions.Count == 0)
+        {
+            MessageBox.Show(this, "No open sessions to log.", "Log All", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        // 只要還有分頁沒在側錄 → 全部開始；否則全部停止。
+        bool startAll = _sessions.Any(s => !s.Page.IsLogging);
+        if (startAll)
+        {
+            int failed = 0;
+            foreach (var s in _sessions)
+                if (!s.Page.StartLog()) failed++;
+            SetLogAllActive(true);
+            if (failed > 0)
+                MessageBox.Show(this, $"{failed} session(s) failed to start logging. See app log for details.",
+                    "Log All", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+        else
+        {
+            foreach (var s in _sessions) s.Page.StopLog();
+            SetLogAllActive(false);
+        }
+    }
+
+    private void SetLogAllActive(bool on)
+    {
+        _logAll.Text = on ? "⏺ Logging All" : "⏺ Log All";
+        _logAll.Width = on ? 110 : 96;
+        _logAll.ForeColor = on ? Theme.SerialColor : Theme.Text;
     }
 
     // ── Run All（個別執行，拒絕 waitall/sendlnall） ──────────
