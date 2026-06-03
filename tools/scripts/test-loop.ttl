@@ -1,0 +1,17 @@
+; test-loop.ttl — while 迴圈 + 變數 + pause 測試
+; 不需遠端回應；觀察 Scripts 檢視的進度（行號/指令）與 log。
+; 執行中可按 Stop 中止。
+
+logopen 'loop.log'
+
+idx = 0
+while idx < 5
+    sendln 'echo loop'
+    logwrite 'iteration'
+    pause 1
+    idx = idx + 1
+endwhile
+
+logwrite 'loop finished'
+logclose
+messagebox 'Loop test done'

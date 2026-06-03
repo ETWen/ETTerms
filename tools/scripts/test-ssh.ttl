@@ -1,0 +1,19 @@
+; test-ssh.ttl — SSH 互動式自動化範例
+; 先在 Terminal 檢視開好 SSH 連線（已登入到 shell），再切到 Scripts 執行。
+; 依你的提示字元調整 wait 目標（$ 一般使用者 / # root）。
+
+timeout = 10
+flushrecv
+
+logopen 'ssh.log'
+
+sendln 'uname -a'
+wait '$'
+sendln 'uptime'
+wait '$'
+sendln 'whoami'
+wait '$'
+
+logwrite 'commands sent'
+logclose
+messagebox 'SSH test done'

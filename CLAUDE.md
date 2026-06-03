@@ -1,0 +1,61 @@
+# CLAUDE.md — ETTerms
+
+> 給 Claude 的專案記憶與指令入口。詳細架構見 [ARCHITECTURE.md](ARCHITECTURE.md)。
+
+## 專案簡介
+
+ETTerms 是一個 **C# .NET 8 WinForms** 的原生 Windows 終端機工作台，主打 **SSH** 與 **Serial Port** 兩種連線，並沿用 / 擴充 MyTeraTerm 的 **TTL 腳本引擎**做自動化。UI 參考 KKTerm（Activity Rail + 分頁工作區 + Saved Connections sidebar）。單機、無雲、無登入系統。
+
+**開發策略：GUI 先行** — 先把視窗外殼 + 分頁 + 連線清單做出來，再逐步補 Serial → SSH → VT100 → 腳本引擎 → Settings/About → PDU/Shell/SFTP。
+
+**進度：** Phase 1–5 ✅、Phase 6 ✅（TTL 引擎 + Group 同步，SSH 待驗收）、Phase 7 ✅（Settings/About）、Phase 8 ✅（PDU + Shell/ConPTY + SFTP + Settings 擴充）。打包待指示。
+
+## 技術棧
+
+- **UI：** C# .NET 8 WinForms（`net8.0-windows`, `UseWindowsForms`, `Nullable=enable`）
+- **SSH：** SSH.NET（`Renci.SshNet`）— Shell + SFTP
+- **Serial：** `System.IO.Ports`
+- **Local Shell：** Windows ConPTY（`CreatePseudoConsole`）— PowerShell / Bash / Cmd
+- **終端機渲染：** 自繪 VT100 / ANSI 控制項（owner-drawn）
+- **腳本：** `TTLInterpreter`（從 `For_AI/MyTeraTerm` 移植，改驅動 `ISessionChannel`）
+- **連線儲存：** SQLite（`Microsoft.Data.Sqlite`）
+- **密碼儲存：** Windows Credential Manager（不落地明碼）
+- **PDU：** SnmpSharpNet（iPoMan II/III via SNMP）
+- **設定持久化：** JSON → `%LocalAppData%\ETTerms\settings.json`
+
+## 常用指令
+
+```powershell
+# 建置 / 執行
+dotnet build
+dotnet run --project src\ETTerms\ETTerms.csproj
+
+# 加套件
+dotnet add src\ETTerms package SSH.NET
+
+# 打包
+dotnet publish src\ETTerms\ETTerms.csproj -c Release -r win-x64 --self-contained false
+```
+
+## 開發慣例
+
+- **命名：** PascalCase 類別 / 方法，`_camelCase` 私有欄位；檔名 = 類別名。
+- **分層：** UI（`App/`）只認 `ISessionChannel` 抽象，不直接相依 SSH.NET / SerialPort。
+- **執行緒：** channel I/O 在背景；所有 UI 更新一律 `Control.Invoke` 回 UI thread。
+- **commit：** 走 Conventional Commits（`feat:` / `fix:` / `refactor:` …）。
+- **參考專案不改：** `For_AI/KKTerm-main`、`For_AI/MyTeraTerm` 只讀對照，不在 repo 內修改。
+
+## 注意事項 / 禁止事項
+
+- 🚫 **密碼絕不寫進 SQLite / 程式碼 / log**，一律走 Windows Credential Manager。
+- 🚫 **不嵌 TeraTerm、不依賴 com0com** —— ETTerms 走全原生（這是與舊版 MyTeraTerm 的關鍵差異）。
+- 🚫 不要把 `For_AI/` 內容 commit 進 git。
+- ⚠️ Serial COM port 同時只能被一個 session 開啟，開啟前檢查可用性。
+- ⚠️ VT 相容性以常見情境（VT100 / 常見 ANSI）為主，冷門 escape 後補，不阻塞 GUI 進度。
+- ⚠️ 本專案**無伺服端祕密 / 無 DB 密碼 / 無 EC2 / 無 VM**，因此不套用 AWS / VirtualBox 部署流程。
+- ⚠️ Group 同步指令（`waitall` / `sendlnall` / `sendlngroup`）**只能在 Run Group 模式**使用；`▶ Script` 和 `▶ Run All` 須拒絕含這些指令的腳本。
+
+## 資料夾用途
+
+- **`For_AI/`** — AI 協作素材與**參考專案**（`KKTerm-main` UI 參考、`MyTeraTerm` Script 參考）。整個資料夾 gitignored，僅供開發對照。
+- 本專案**無 `secret/` 資料夾**：沒有伺服端祕密 / DB 密碼 / compile-time secret，連線密碼一律走 Windows Credential Manager。

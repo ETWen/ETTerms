@@ -1,0 +1,22 @@
+; test-echo.ttl — 最簡單的收發測試
+; 適用：Serial loopback（TX 接 RX）或任何會回顯的連線
+; 送出的字會被回顯回來，wait 命中後寫進 log。
+
+prompt = '6000#'
+
+wait '6000 login:'
+sendln 'admin'
+wait 'Password: '
+sendln ''
+
+wait prompt
+sendln 'show version'
+
+wait prompt
+sendln 'show int b'
+
+wait prompt
+sendln 'show int b'
+
+
+messagebox 'Echo test done'

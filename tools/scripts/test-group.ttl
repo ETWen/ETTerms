@@ -1,0 +1,17 @@
+
+prompt = '6000#'
+
+wait '6000 login:'
+sendln 'admin'
+wait 'Password: '
+sendln ''
+
+waitall prompt
+sendlngroup A "show version"
+sendlngroup B "show int b"
+waitall prompt
+sendlngroup A "show version"
+sendlngroup B "show int b"
+waitall prompt
+sendlngroup A "show int b"
+sendlngroup B "show version"

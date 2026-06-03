@@ -1,0 +1,16 @@
+# ─── .NET / WinForms build 產物 ───────────────────────────────
+bin/
+obj/
+*.user
+publish/
+[Dd]ebug/
+[Rr]elease/
+.vs/
+
+# ─── 本機資料庫 / 設定（執行期產生）───────────────────────────
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# ─── AI 協作素材 / 參考專案不入 git ──────────────────────────
+For_AI/
