@@ -480,9 +480,52 @@ cd F:\10_AI\ETTerms
 dotnet build
 dotnet run --project src\ETTerms\ETTerms.csproj
 
-# 5. 打包（後期 Phase）
-dotnet publish src\ETTerms\ETTerms.csproj -c Release -r win-x64 --self-contained false
+# 5. 打包（見下方「Publish / 打包慣例」）
+dotnet publish src\ETTerms\ETTerms.csproj -c Release -r win-x64 --self-contained false `
+    -o src\ETTerms\Publish\ETTerms_v<Version>
 #    後續可用 Inno Setup / MSIX 做安裝程式
+```
+
+---
+
+## Publish / 打包慣例
+
+> 每次發 Release 都依此規則產出，方便辨識版本與一併攜帶 MCP server。
+
+**輸出位置（固定）：** `src\ETTerms\Publish\ETTerms_v{Version}\`
+- `{Version}` 取自 `src\ETTerms\ETTerms.csproj` 的 `<Version>`（例：`0.2.0`）。
+- 資料夾命名：`ETTerms_v{Version}`（前綴 `v`，例：`ETTerms_v0.2.0`）。
+- `Publish/` 已 gitignore（`publish/`），**不入 git**。
+
+**內容結構：**
+```
+ETTerms_v0.2.0\
+├── ETTerms v0.2.0.exe        # 主程式 apphost，改名為「ETTerms v{Version}.exe」
+├── ETTerms.dll + 各相依 dll  # SSH.NET / SQLite / SnmpSharpNet / System.IO.Ports …
+└── ETTerms.SerialMcp\        # Serial MCP server，獨立發佈到子資料夾（相依 dll 與 GUI 隔離）
+    ├── ETTerms.SerialMcp.exe
+    └── ETTerms.SerialMcp.dll + 相依
+```
+
+**規則：**
+1. **GUI 與 MCP 都發佈**：主程式發到 `ETTerms_v{Version}\`，`ETTerms.SerialMcp` 發到其下 **`ETTerms.SerialMcp\` 子資料夾**（兩者相依 dll 不互相覆蓋）。
+2. **主 exe 改名**：`dotnet publish` 產生的 `ETTerms.exe` 重新命名為 **`ETTerms v{Version}.exe`**。
+   - 可安全改名：.NET apphost 內部記錄要載入的 `ETTerms.dll`，**不靠自身檔名**，改名後仍正常啟動。
+3. **框架相依**：`--self-contained false -r win-x64`（目標機需已裝 .NET 8 Desktop Runtime）。
+
+**PowerShell 範例：**
+```powershell
+$ver    = ([regex]::Match((Get-Content src\ETTerms\ETTerms.csproj -Raw), '<Version>([^<]+)</Version>')).Groups[1].Value
+$root   = "src\ETTerms\Publish\ETTerms_v$ver"
+if (Test-Path $root) { Remove-Item $root -Recurse -Force }
+
+# 1) GUI
+dotnet publish src\ETTerms\ETTerms.csproj         -c Release -r win-x64 --self-contained false -o $root
+Rename-Item (Join-Path $root "ETTerms.exe") "ETTerms v$ver.exe"
+
+# 2) Serial MCP server → 子資料夾
+dotnet publish src\ETTerms.SerialMcp\ETTerms.SerialMcp.csproj -c Release -r win-x64 --self-contained false `
+    -o (Join-Path $root "ETTerms.SerialMcp")
 ```
 
 ---

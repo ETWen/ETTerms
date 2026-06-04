@@ -177,6 +177,16 @@ public sealed class AboutView : UserControl
 
     private static readonly ChangelogEntry[] Changelog =
     [
+        new("0.2.0", new DateOnly(2026, 6, 4), "Beta Version Release",
+        [
+            "Phase 9: Serial MCP server — AI agents can send/receive serial while you watch live in the GUI.",
+            "GUI is the sole COM-port owner; the MCP server bridges over a local named pipe (never opens the port itself).",
+            "MCP tools: serial_list / serial_attach / serial_write / serial_read / serial_detach.",
+            "AI-sourced output is echoed into the terminal tagged [AI] so you see exactly what the AI sees.",
+            "New app icon for the window title bar, taskbar and executable; version now shown in the title bar.",
+            "About page now displays the app icon.",
+            "Beta Version: expect bugs and missing features. Feedback welcome!",
+        ]),
         new("0.1.0", new DateOnly(2026, 6, 3), "Initial Release",
         [
             "Beta Version: expect bugs and missing features. Feedback welcome!",

@@ -39,7 +39,7 @@ public partial class MainForm : Form
 
         var v = Assembly.GetExecutingAssembly().GetName().Version;
         var versionStr = v != null ? $"{v.Major}.{v.Minor}.{v.Build}" : "0.1.0";
-        Text = $"ETTerms   Version v{versionStr}";
+        Text = $"ETTerms   v{versionStr}";
     }
 
     private void BuildLayout()

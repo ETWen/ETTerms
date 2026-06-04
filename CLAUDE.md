@@ -38,8 +38,12 @@ dotnet run --project src\ETTerms\ETTerms.csproj
 # 加套件
 dotnet add src\ETTerms package SSH.NET
 
-# 打包
-dotnet publish src\ETTerms\ETTerms.csproj -c Release -r win-x64 --self-contained false
+# 打包（見「Publish / 打包慣例」，輸出固定到 src\ETTerms\Publish\ETTerms_v{Version}\）
+$ver = ([regex]::Match((Get-Content src\ETTerms\ETTerms.csproj -Raw), '<Version>([^<]+)</Version>')).Groups[1].Value
+$root = "src\ETTerms\Publish\ETTerms_v$ver"
+dotnet publish src\ETTerms\ETTerms.csproj -c Release -r win-x64 --self-contained false -o $root
+Rename-Item (Join-Path $root "ETTerms.exe") "ETTerms v$ver.exe"
+dotnet publish src\ETTerms.SerialMcp\ETTerms.SerialMcp.csproj -c Release -r win-x64 --self-contained false -o (Join-Path $root "ETTerms.SerialMcp")
 
 # 註冊 Serial MCP server（給 AI agent 操作 serial）
 kiro-cli mcp add --name serial --command dotnet --args "run --project src\ETTerms.SerialMcp\ETTerms.SerialMcp.csproj"
@@ -48,6 +52,7 @@ kiro-cli mcp add --name serial --command dotnet --args "run --project src\ETTerm
 ## 開發慣例
 
 - **命名：** PascalCase 類別 / 方法，`_camelCase` 私有欄位；檔名 = 類別名。
+- **Publish / 打包：** 固定輸出到 `src\ETTerms\Publish\ETTerms_v{Version}\`（`{Version}` 取自 csproj `<Version>`）；主 exe 改名為 `ETTerms v{Version}.exe`；`ETTerms.SerialMcp` 一併發到其下 `ETTerms.SerialMcp\` 子資料夾。框架相依（`--self-contained false -r win-x64`）。詳見 [ARCHITECTURE.md](ARCHITECTURE.md#publish--打包慣例)。
 - **分層：** UI（`App/`）只認 `ISessionChannel` 抽象，不直接相依 SSH.NET / SerialPort。
 - **執行緒：** channel I/O 在背景；所有 UI 更新一律 `Control.Invoke` 回 UI thread。
 - **commit：** 走 Conventional Commits（`feat:` / `fix:` / `refactor:` …）。
