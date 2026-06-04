@@ -8,7 +8,9 @@ ETTerms 是一個 **C# .NET 8 WinForms** 的原生 Windows 終端機工作台，
 
 **開發策略：GUI 先行** — 先把視窗外殼 + 分頁 + 連線清單做出來，再逐步補 Serial → SSH → VT100 → 腳本引擎 → Settings/About → PDU/Shell/SFTP。
 
-**進度：** Phase 1–5 ✅、Phase 6 ✅（TTL 引擎 + Group 同步，SSH 待驗收）、Phase 7 ✅（Settings/About）、Phase 8 ✅（PDU + Shell/ConPTY + SFTP + Settings 擴充）、Phase 9 🔜（Serial MCP server：**GUI 持有 COM port，MCP 經本機 named pipe 橋接**，AI 收發的資料即時顯示在 GUI）。打包待指示。
+**進度：** Phase 1–5 ✅、Phase 6 ✅（TTL 引擎 + Group 同步，SSH 待驗收）、Phase 7 ✅（Settings/About）、Phase 8 ✅（PDU + Shell/ConPTY + SFTP + Settings 擴充）、Phase 9 ✅（Serial MCP server：**GUI 持有 COM port，MCP 經本機 named pipe 橋接**，AI 收發的資料即時以 `[AI]` 標色顯示在 GUI）。打包待指示。
+
+**v0.2.0：** Phase 9 完成 — `ETTerms.SerialMcp`（stdio MCP server）+ GUI `SerialBridgeServer`（named pipe `\\.\pipe\etterms-serial`）上線，提供 `serial_list` / `serial_attach` / `serial_write` / `serial_read` / `serial_detach` 五個工具，AI 的 TX 在 GUI 以 `[AI]` 標色即時 echo；視窗 / 工作列 / About 改用 Choco 圖示，標題列顯示版本號。見 [docs/serial-mcp-guide.md](docs/serial-mcp-guide.md)。
 
 **v0.1.2：** 新增 `sprintf2`（TeraTerm 相容 C printf 格式化）；`wait` 改為命中關鍵字後須等裝置安靜（`SettleMs` 預設 300ms）才接受並取「最後一次」出現，排除輸出中途的指令回顯（避免腳本搶跑）。
 
@@ -65,6 +67,6 @@ kiro-cli mcp add --name serial --command dotnet --args "run --project src\ETTerm
 ## 資料夾用途
 
 - **`src/ETTerms/`** — 主應用程式（WinForms 視窗外殼 + 連線 / 終端機 / 腳本引擎）。
-- **`src/ETTerms.SerialMcp/`** — 🔜 stdio MCP server（給 AI agent 收發 serial）。獨立行程，但**不直接開 COM port**：經本機 named pipe 連到 GUI 的 `SerialBridgeServer`，由 GUI 代為讀寫實體 port；net8.0 console + `ModelContextProtocol` SDK。
+- **`src/ETTerms.SerialMcp/`** — ✅ stdio MCP server（給 AI agent 收發 serial）。獨立行程，但**不直接開 COM port**：經本機 named pipe 連到 GUI 的 `SerialBridgeServer`，由 GUI 代為讀寫實體 port；net8.0 console + `ModelContextProtocol` SDK。
 - **`For_AI/`** — AI 協作素材與**參考專案**（`KKTerm-main` UI 參考、`MyTeraTerm` Script 參考）。整個資料夾 gitignored，僅供開發對照。
 - 本專案**無 `secret/` 資料夾**：沒有伺服端祕密 / DB 密碼 / compile-time secret，連線密碼一律走 Windows Credential Manager。

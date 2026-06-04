@@ -142,7 +142,8 @@ ETTerms/
         │   ├── ShellChannel.cs     #   Windows ConPTY 本機 Shell
         │   ├── SessionPage.cs      #   一個分頁 = TerminalView + Channel + 狀態
         │   ├── SessionManager.cs   #   開 / 關 / 列舉所有 active session
-        │   └── SerialBridgeServer.cs# 🔜 本機 named pipe server：把 serial session 的讀寫橋接給 MCP（Phase 9）
+        │   ├── SerialBridgeServer.cs# ✅ 本機 named pipe server：把 serial session 的讀寫橋接給 MCP（Phase 9）
+        │   └── SerialBridge.cs     # ✅ SerialBridgeEndpoint：單一 serial session 與 pipe 的橋接點
         │
         ├── Connections/            # ── 連線資料 ──
         │   ├── Connection.cs       #   連線 metadata 模型
@@ -161,7 +162,7 @@ ETTerms/
             ├── AppSettings.cs      #   使用者偏好 (JSON, %LocalAppData%\ETTerms\settings.json)
             └── NativeTheme.cs      #   深色標題列 (DWM)
     │
-    └── ETTerms.SerialMcp/          # 🔜 Serial MCP server（stdio）——不自己開 port，經 named pipe 橋接 GUI
+    └── ETTerms.SerialMcp/          # ✅ Serial MCP server（stdio）——不自己開 port，經 named pipe 橋接 GUI
         ├── Program.cs              #   stdio MCP host 進入點
         ├── SerialBridgeClient.cs   #   連 GUI 的 named pipe，轉發 write / 接收 RX
         ├── SerialTools.cs          #   serial_list / attach / write / read / detach 工具（轉發到 pipe）
@@ -584,16 +585,16 @@ dotnet publish src\ETTerms\ETTerms.csproj -c Release -r win-x64 --self-contained
 - [ ] `dotnet publish` + Inno Setup / MSIX 安裝程式（待使用者指示）
 **驗收條件：** ✅ PDU 指令可用；Settings 重啟保留；Local Shell 行為正常（ConPTY）；SFTP 可瀏覽遠端目錄。打包待後續。
 
-### Phase 9 — AI 整合：Serial MCP Server（GUI 橋接模式）（工作量：M）🔜 規劃中
+### Phase 9 — AI 整合：Serial MCP Server（GUI 橋接模式）（工作量：M）✅ 已完成
 **目標：** 讓 Kiro CLI / Claude CLI 等 AI agent 收發 serial，且**使用者能在 GUI 即時看到 AI 的收發**。COM port 由 GUI 唯一持有，MCP 經本機 named pipe 橋接（見 [AI / MCP Integration](#ai--mcp-integrationserial-mcp-server)）。
 **包含：**
-- [ ] GUI：`Sessions/SerialBridgeServer.cs`——本機 named pipe server，暴露 list / attach / write / read，並把 serial session 的 RX 廣播給 client
-- [ ] GUI：TerminalView 支援把 MCP 來源的 TX 以 `[AI]` 標色 echo，使用者可區分 AI 與手打輸入
-- [ ] `src/ETTerms.SerialMcp/`：.NET 8 console + 官方 C# MCP SDK（`ModelContextProtocol`），stdio / JSON-RPC
-- [ ] `SerialBridgeClient.cs`：連 GUI pipe、轉發 write、累積 RX
-- [ ] 工具：`serial_list` / `serial_attach` / `serial_write` / `serial_read`（含 `waitFor` + `timeoutMs`）/ `serial_detach`
-- [ ] 註冊說明（`kiro-cli mcp add` / agent.json `mcpServers`）寫入 README，含「需先在 GUI 開好 port」前提
-**驗收條件：** GUI 開一條 Serial（COM3）→ 另一分頁 PowerShell 跑 kiro → AI 經 MCP `serial_attach` COM3 → `serial_write` 送指令、`serial_read` 讀回應，**整個過程在 GUI Tab1 即時可見（AI 的 TX 有 `[AI]` 標色）**；全程只有 GUI 開該 port。
+- [x] GUI：`Sessions/SerialBridgeServer.cs`——本機 named pipe server（`\\.\pipe\etterms-serial`），暴露 list / attach / write / read，並把 serial session 的 RX 廣播給 client；`SerialBridge.cs` 為單一 session 的橋接端點
+- [x] GUI：`SessionPage.WriteFromAi` 把 MCP 來源的 TX 以 `[AI]` 標色（`\x1b[35m`）echo，使用者可區分 AI 與手打輸入
+- [x] `src/ETTerms.SerialMcp/`：.NET 8 console + 官方 C# MCP SDK（`ModelContextProtocol`），stdio / JSON-RPC
+- [x] `SerialBridgeClient.cs`：連 GUI pipe、轉發 write、背景累積 RX
+- [x] 工具：`serial_list` / `serial_attach` / `serial_write` / `serial_read`（含 `waitFor` + `timeoutMs`）/ `serial_detach`
+- [x] 註冊說明（`kiro-cli mcp add` / agent.json `mcpServers`）寫入 [docs/serial-mcp-guide.md](docs/serial-mcp-guide.md)，含「需先在 GUI 開好 port」前提
+**驗收條件：** ✅ GUI 開一條 Serial（COM3）→ 另一分頁 PowerShell 跑 kiro → AI 經 MCP `serial_attach` COM3 → `serial_write` 送指令、`serial_read` 讀回應，**整個過程在 GUI Tab1 即時可見（AI 的 TX 有 `[AI]` 標色）**；全程只有 GUI 開該 port。
 
 ---
 
@@ -601,7 +602,7 @@ dotnet publish src\ETTerms\ETTerms.csproj -c Release -r win-x64 --self-contained
 
 這個版本**不做、但未來可能加**：
 
-- **AI / MCP 整合**（🔜 已列為 [Phase 9](#development-phases)：Serial MCP Server，讓 AI agent 直接操作 serial；未來可再擴充 SSH / Shell MCP 工具）
+- ~~**AI / MCP 整合**~~（✅ 已於 [Phase 9](#development-phases) 實作：Serial MCP Server，讓 AI agent 直接操作 serial；未來可再擴充 SSH / Shell MCP 工具）
 - ~~**SFTP 檔案瀏覽**~~（✅ 已於 Phase 8 實作：sidebar SFTP 分頁）
 - **Telnet** session 類型（補一個 `TelnetChannel : ISessionChannel`）
 - **RDP / VNC** 分頁（KKTerm 用 mstscax.dll；ETTerms 可後期評估）

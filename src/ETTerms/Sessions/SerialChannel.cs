@@ -17,6 +17,12 @@ public sealed class SerialChannel : ISessionChannel
 
     public string LogName => _portName;
 
+    /// <summary>目前傳輸速率（供 MCP 橋接列出 session 用）。</summary>
+    public int BaudRate => _port.BaudRate;
+
+    /// <summary>送出換行序列（AI 寫入時附加，與手打 Enter 一致）。</summary>
+    public string NewLine => _port.NewLine;
+
     public SerialChannel(SerialSettings s)
     {
         _portName = s.PortName;
