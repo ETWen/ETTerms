@@ -30,13 +30,10 @@ while 1
 
     wait prompt_SVOS               ; 登入後第一個就緒提示（此處無指令輸出，安全）
     sendln "version"
-    wait "SHA:"                    ; 先等 version 輸出跑完（最後一行），避免比對到回顯的 "SVOS> version"
     wait prompt_SVOS
     sendln "help"
-    wait "more info"               ; 先等 help 輸出跑完，再等就緒提示
     wait prompt_SVOS
     sendln "help"
-    wait "more info"
     wait prompt_SVOS
 
     cnt_total = cnt_total + 1
@@ -44,4 +41,3 @@ while 1
 	sendln total_print
     wait prompt_SVOS
 endwhile
-
