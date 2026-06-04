@@ -10,6 +10,8 @@ ETTerms 是一個 **C# .NET 8 WinForms** 的原生 Windows 終端機工作台，
 
 **進度：** Phase 1–5 ✅、Phase 6 ✅（TTL 引擎 + Group 同步，SSH 待驗收）、Phase 7 ✅（Settings/About）、Phase 8 ✅（PDU + Shell/ConPTY + SFTP + Settings 擴充）、Phase 9 🔜（Serial MCP server，讓 AI 直接操作 serial）。打包待指示。
 
+**v0.1.2：** 新增 `sprintf2`（TeraTerm 相容 C printf 格式化）；`wait` 改為命中關鍵字後須等裝置安靜（`SettleMs` 預設 300ms）才接受並取「最後一次」出現，排除輸出中途的指令回顯（避免腳本搶跑）。
+
 ## 技術棧
 
 - **UI：** C# .NET 8 WinForms（`net8.0-windows`, `UseWindowsForms`, `Nullable=enable`）
