@@ -66,9 +66,9 @@
   - 腳本指令：`pduconnect` / `pductrl`
 
 - 🤖 **AI / MCP 整合（選用，規劃中）**
-  - 獨立的 stdio **Serial MCP server** 把 serial port 暴露成 AI 可呼叫工具，供 **Kiro CLI / Claude CLI** 使用
-  - 工具：`serial_list` / `serial_open` / `serial_write` / `serial_read` / `serial_close`
-  - 直接對 AI 說「開某個 COM port、送指令、讀回應」即可
+  - **COM port 由 GUI 持有**；獨立的 stdio **Serial MCP server** 經本機 named pipe 橋接過去，供 **Kiro CLI / Claude CLI** 使用
+  - 工具：`serial_list` / `serial_attach` / `serial_write` / `serial_read` / `serial_detach`
+  - AI 的 serial 收發會即時顯示在 GUI（標 `[AI]`）——先在 GUI 開好 port，再讓 AI attach
 
 - 📊 **連線 RX 日誌**
   - `logopen` / `logwrite` / `logclose` 將工作階段輸出寫檔
@@ -271,19 +271,21 @@ wait 'login: '
 
 ## 🤖 AI / MCP 整合
 
-> 🔜 **規劃中（Phase 9）。** 讓 AI agent（**Kiro CLI / Claude CLI**）直接對 serial port 下指令、讀輸出。
+> 🔜 **規劃中（Phase 9）。** 讓 AI agent（**Kiro CLI / Claude CLI**）收發 serial，**而且你能在 ETTerms GUI 即時看到 AI 的每筆收發**。
 
-ETTerms 額外提供一支獨立的 **stdio MCP server**（`src/ETTerms.SerialMcp/`），把 serial port 包成 AI 可呼叫的工具。它與 WinForms 主程式**各自獨立行程**：由 MCP client（Kiro CLI / Claude CLI）啟動並維持整個 session 存活，因此能**持續持有 COM port**——連線狀態可跨多次工具呼叫保留，也能接收裝置主動推送的非同步輸出。
+**關鍵設計：COM port 由 GUI 唯一持有，MCP server 不自己開 port。** 一個 COM port 同時只能被一個行程開啟；因此不讓 MCP server 自己開，而是 **GUI 當 port 的唯一擁有者**，在 GUI 內跑一支本機 **named pipe server**（`SerialBridgeServer`）。獨立的 `ETTerms.SerialMcp`（由 Kiro/Claude CLI 啟動）退化成瘦客戶端：所有 `write` / `read` 都經 pipe 轉發給 GUI，由 GUI 代為讀寫實體 port。AI 的 TX 會以 `[AI]` 標色 echo 進終端機，RX/TX 都流經 GUI channel，**你看到的就是 AI 看到的**。
 
-> **為何要獨立常駐行程？** CLI agent 的每條 shell 指令都是新行程，`open→write→read` 無法跨呼叫保留狀態（port 一關就斷）。常駐的 MCP server 才能維持一條連線、累積接收緩衝。
+全閉迴路——全部跑在 ETTerms GUI 內：
+- **Tab1：** 一條 Serial 連線持有 COM3（即時顯示流量，AI 的寫入標 `[AI]`）
+- **Tab2：** 一個 PowerShell（ConPTY）分頁跑 `kiro-cli`，它啟動 `ETTerms.SerialMcp`，再連回 pipe
 
 | 工具 | 參數 | 說明 |
 |------|------|------|
-| `serial_list` | — | 列出可用 COM port |
-| `serial_open` | portName, baudRate, dataBits, parity, stopBits, handshake, newLine | 開啟並持有 port |
-| `serial_write` | text, appendNewLine? | 送出文字（可選附加換行） |
-| `serial_read` | waitFor?, timeoutMs? | 取出 RX 緩衝；可等待特定字串或逾時 |
-| `serial_close` | — | 關閉 port |
+| `serial_list` | — | 列出 **GUI 目前開著的** serial session（名稱 + baud） |
+| `serial_attach` | portName | 以 COM 名稱綁定到 GUI 的 serial session（write/read 前必須先 attach） |
+| `serial_write` | text, appendNewline? | 經 GUI 送出文字（即時以 `[AI]` 標色顯示） |
+| `serial_read` | waitFor?, timeoutMs? | 取出累積的 RX；可等待子字串或逾時 |
+| `serial_detach` | — | 解除綁定（**不會**關閉 GUI 的 port） |
 
 在 Kiro CLI 註冊：
 
@@ -291,9 +293,11 @@ ETTerms 額外提供一支獨立的 **stdio MCP server**（`src/ETTerms.SerialMc
 kiro-cli mcp add --name serial --command dotnet --args "run --project src\ETTerms.SerialMcp\ETTerms.SerialMcp.csproj"
 ```
 
-或寫進 `agent.json` 的 `mcpServers`（Claude CLI 用其對應的 `mcpServers` 設定）。註冊後直接對 AI 說：*「列出 COM port、開 COM3 115200、送 `AT` 看回應」*。
+或寫進 `agent.json` 的 `mcpServers`（Claude CLI 用其對應的 `mcpServers` 設定）。**先在 ETTerms GUI 開好要操作的 serial 連線**，再對 AI 說：*「列出 serial session、接上 COM3、送 `AT` 看回應」*。
 
-> ⚠️ 一個 COM port 同時只能被一個行程開啟——別在 GUI 與 MCP server 同時開同一個 port。
+> ⚠️ COM port 由 GUI 唯一持有；MCP server 經 pipe attach，自己不開 port，因此不會與 GUI 衝突。
+
+📖 完整註冊與使用步驟：[docs/serial-mcp-guide.md](docs/serial-mcp-guide.md)。
 
 ---
 

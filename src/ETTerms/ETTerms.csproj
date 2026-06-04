@@ -10,10 +10,18 @@
     <AssemblyName>ETTerms</AssemblyName>
 
     <!-- 版本資訊 -->
-    <Version>0.1.3</Version>
+    <Version>0.2.0</Version>
     <Product>ETTerms</Product>
     <Company>ETTerms Project</Company>
+
+    <!-- 視窗 / 工作列 / exe 圖示 -->
+    <ApplicationIcon>Assets\Choco_256x256.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 視窗圖示 (title bar / taskbar / About 大圖)，內嵌進組件 -->
+    <EmbeddedResource Include="Assets\Choco_256x256.ico" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.10" />

@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Forms;
 
@@ -30,12 +31,13 @@ public sealed class TerminalView : UserControl
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint
                | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
         BackColor = Color.FromArgb(18, 18, 22);
+        ImeMode = ImeMode.NoControl;   // 容器控制項預設關 IME，這裡明確開啟讓使用者可切中文
         _font = new Font(profile.FontFamily, profile.FontSize);
         using (var g = CreateGraphics())
         {
             var sz = TextRenderer.MeasureText(g, "W", _font, Size.Empty, TextFormatFlags.NoPadding);
             _cellW = Math.Max(1, sz.Width);
-            _cellH = Math.Max(1, _font.Height);
+            _cellH = Math.Max(1, _font.Height + 2);   // +2 行距，避免 g/y 下緣與中文底部被裁切
         }
         _buf = new ScreenBuffer(profile.Cols, profile.Rows,
             Color.FromArgb(220, 220, 220), BackColor, profile.ScrollbackLines);
@@ -90,13 +92,26 @@ public sealed class TerminalView : UserControl
         while (c < line.Length)
         {
             var cell = line[c];
+            if ((cell.Attr & CellAttr.WideTrail) != 0) { c++; continue; }   // 寬字第二格，由前格覆蓋
             ResolveColors(cell, out var fg, out var bg, abs, c);
-            // 合併同屬性連續格
+
+            // 寬字(全形 CJK)：單獨繪製，占 2 格寬
+            if ((cell.Attr & CellAttr.Wide) != 0)
+            {
+                var wr = new Rectangle(c * _cellW, y, _cellW * 2, _cellH);
+                using (var bb = new SolidBrush(bg)) g.FillRectangle(bb, wr);
+                DrawRun(g, cell.Ch == '\0' ? " " : cell.Ch.ToString(), cell.Attr, wr, fg);
+                c++;
+                continue;
+            }
+
+            // 合併同屬性連續的窄字
             int start = c;
             var sb = new StringBuilder();
             while (c < line.Length)
             {
                 var cur = line[c];
+                if ((cur.Attr & (CellAttr.Wide | CellAttr.WideTrail)) != 0) break;
                 ResolveColors(cur, out var f2, out var b2, abs, c);
                 if (f2 != fg || b2 != bg || (cur.Attr & CellAttr.Bold) != (cell.Attr & CellAttr.Bold)) break;
                 sb.Append(cur.Ch == '\0' ? ' ' : cur.Ch);
@@ -104,12 +119,17 @@ public sealed class TerminalView : UserControl
             }
             var rect = new Rectangle(start * _cellW, y, (c - start) * _cellW, _cellH);
             using (var bb = new SolidBrush(bg)) g.FillRectangle(bb, rect);
-            var style = (cell.Attr & CellAttr.Bold) != 0 ? FontStyle.Bold : FontStyle.Regular;
-            if ((cell.Attr & CellAttr.Underline) != 0) style |= FontStyle.Underline;
-            using var fnt = style == FontStyle.Regular ? _font : new Font(_font, style);
-            TextRenderer.DrawText(g, sb.ToString(), fnt, rect, fg,
-                TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.Left);
+            DrawRun(g, sb.ToString(), cell.Attr, rect, fg);
         }
+    }
+
+    private void DrawRun(Graphics g, string text, CellAttr attr, Rectangle rect, Color fg)
+    {
+        var style = (attr & CellAttr.Bold) != 0 ? FontStyle.Bold : FontStyle.Regular;
+        if ((attr & CellAttr.Underline) != 0) style |= FontStyle.Underline;
+        using var fnt = style == FontStyle.Regular ? _font : new Font(_font, style);
+        TextRenderer.DrawText(g, text, fnt, rect, fg,
+            TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.Left);
     }
 
     private void ResolveColors(Cell cell, out Color fg, out Color bg, int abs, int col)
@@ -223,7 +243,10 @@ public sealed class TerminalView : UserControl
             int from = abs == a.row ? a.col : 0;
             int to = abs == b.row ? b.col : line.Length;
             for (int c = from; c < Math.Min(to, line.Length); c++)
+            {
+                if ((line[c].Attr & CellAttr.WideTrail) != 0) continue;
                 sb.Append(line[c].Ch == '\0' ? ' ' : line[c].Ch);
+            }
             if (abs < b.row) sb.Append("\r\n");
         }
         var text = sb.ToString();
@@ -239,4 +262,83 @@ public sealed class TerminalView : UserControl
         }
         catch { }
     }
+
+    // ── IME（中文 / 日文 / 韓文輸入）─────────────────────────
+    // 自繪控制項預設不處理 IME 組字，故攔截 WM_IME_COMPOSITION 取「結果字串」直接送出 UTF-8。
+    private const int WM_IME_STARTCOMPOSITION = 0x010D;
+    private const int WM_IME_COMPOSITION = 0x010F;
+    private const int GCS_RESULTSTR = 0x0800;
+    private const int CFS_POINT = 0x0002;
+    private const int IACE_DEFAULT = 0x0010;
+
+    // UserControl(容器)預設不啟用 IME，使用者無法切中文。把預設 IME context 綁回此視窗，
+    // 並在取得焦點後(WinForms 可能於 OnGotFocus 內關掉)再綁一次，確保可切換輸入法。
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+        ImmAssociateContextEx(Handle, IntPtr.Zero, IACE_DEFAULT);
+    }
+
+    protected override void OnGotFocus(EventArgs e)
+    {
+        base.OnGotFocus(e);
+        ImmAssociateContextEx(Handle, IntPtr.Zero, IACE_DEFAULT);
+    }
+
+    protected override void WndProc(ref Message m)
+    {
+        if (m.Msg == WM_IME_STARTCOMPOSITION) MoveImeWindowToCursor();
+        else if (m.Msg == WM_IME_COMPOSITION && ((long)m.LParam & GCS_RESULTSTR) != 0)
+        {
+            var s = ReadImeResult();
+            if (!string.IsNullOrEmpty(s))
+            {
+                SendData?.Invoke(Encoding.UTF8.GetBytes(s));
+                return;   // 消費此訊息，避免預設再轉成 WM_CHAR 造成重複輸入
+            }
+        }
+        base.WndProc(ref m);
+    }
+
+    private string ReadImeResult()
+    {
+        IntPtr hImc = ImmGetContext(Handle);
+        if (hImc == IntPtr.Zero) return "";
+        try
+        {
+            int len = ImmGetCompositionStringW(hImc, GCS_RESULTSTR, null, 0);
+            if (len <= 0) return "";
+            var buf = new byte[len];
+            ImmGetCompositionStringW(hImc, GCS_RESULTSTR, buf, len);
+            return Encoding.Unicode.GetString(buf);
+        }
+        finally { ImmReleaseContext(Handle, hImc); }
+    }
+
+    private void MoveImeWindowToCursor()
+    {
+        IntPtr hImc = ImmGetContext(Handle);
+        if (hImc == IntPtr.Zero) return;
+        try
+        {
+            int vr = _buf.CursorRow + _scrollOffset;
+            var cf = new COMPOSITIONFORM
+            {
+                dwStyle = CFS_POINT,
+                ptCurrentPos = new POINT { x = _buf.CursorCol * _cellW, y = vr * _cellH }
+            };
+            ImmSetCompositionWindow(hImc, ref cf);
+        }
+        finally { ImmReleaseContext(Handle, hImc); }
+    }
+
+    [StructLayout(LayoutKind.Sequential)] private struct POINT { public int x, y; }
+    [StructLayout(LayoutKind.Sequential)] private struct RECT { public int left, top, right, bottom; }
+    [StructLayout(LayoutKind.Sequential)] private struct COMPOSITIONFORM { public int dwStyle; public POINT ptCurrentPos; public RECT rcArea; }
+
+    [DllImport("imm32.dll")] private static extern IntPtr ImmGetContext(IntPtr hWnd);
+    [DllImport("imm32.dll")] private static extern bool ImmAssociateContextEx(IntPtr hWnd, IntPtr hIMC, int dwFlags);
+    [DllImport("imm32.dll")] private static extern bool ImmReleaseContext(IntPtr hWnd, IntPtr hIMC);
+    [DllImport("imm32.dll", CharSet = CharSet.Unicode)] private static extern int ImmGetCompositionStringW(IntPtr hIMC, int dwIndex, byte[]? lpBuf, int dwBufLen);
+    [DllImport("imm32.dll")] private static extern bool ImmSetCompositionWindow(IntPtr hIMC, ref COMPOSITIONFORM lpCompForm);
 }

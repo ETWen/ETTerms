@@ -1,6 +1,7 @@
 using System.Drawing;
 using System.Reflection;
 using System.Windows.Forms;
+using ETTerms.Infrastructure;
 
 namespace ETTerms.App;
 
@@ -54,6 +55,9 @@ public sealed class AboutView : UserControl
             p.Controls.Add(MakeLine("  TTL Script Engine (ported from MyTeraTerm)", Theme.UiFont, Theme.TextDim));
         }));
 
+        // Brand card — large app icon + logo
+        left.Controls.Add(MakeBrandCard());
+
         // ═══ RIGHT PANEL — Changelog (scrollable) ═══
         var right = new FlowLayoutPanel
         {
@@ -106,6 +110,37 @@ public sealed class AboutView : UserControl
             WrapContents = false, BackColor = Theme.TabBack, AutoSize = false
         };
         build(flow);
+        card.Controls.Add(flow);
+        return card;
+    }
+
+    /// <summary>底部品牌卡：大的 Choco 圖示 + ETTerms 標誌圖。</summary>
+    private static Panel MakeBrandCard()
+    {
+        var card = new Panel
+        {
+            Width = 340, Height = 300, Margin = new Padding(0, 0, 0, 12),
+            BackColor = Theme.TabBack, Padding = new Padding(12)
+        };
+        var flow = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown,
+            WrapContents = false, BackColor = Theme.TabBack, AutoSize = false
+        };
+
+        // 大圖示 (256x256)，等比縮放塞滿框、不裁切
+        var iconImg = AppAssets.AppIcon(256);
+        if (iconImg != null)
+        {
+            flow.Controls.Add(new PictureBox
+            {
+                Width = 312, Height = 268, Margin = new Padding(0, 4, 0, 4),
+                SizeMode = PictureBoxSizeMode.Zoom,
+                BackColor = Theme.TabBack, Image = iconImg.ToBitmap()
+            });
+            iconImg.Dispose();
+        }
+
         card.Controls.Add(flow);
         return card;
     }

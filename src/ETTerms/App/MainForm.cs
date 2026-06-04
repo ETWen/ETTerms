@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Windows.Forms;
 using ETTerms.App.Workspace;
 using ETTerms.Infrastructure;
@@ -17,14 +18,28 @@ public partial class MainForm : Form
     private readonly AboutView _about = new();
     private readonly StatusStrip _status = new();
     private readonly ToolStripStatusLabel _statusLabel = new();
+    private readonly Sessions.SerialBridgeServer _bridge = new();
 
     public MainForm()
     {
         InitializeComponent();
+        ApplyIconAndTitle();
         BuildLayout();
         WireEvents();
         AppSettings.Instance.ApplyWindowPosition(this);
+        _bridge.Start();   // 本機 named pipe，供 ETTerms.SerialMcp 橋接 serial
         AppLogger.Info("MainForm initialized");
+    }
+
+    /// <summary>設定視窗 / 工作列圖示，並在標題列加上版本號。</summary>
+    private void ApplyIconAndTitle()
+    {
+        var icon = AppAssets.AppIcon();
+        if (icon != null) Icon = icon;
+
+        var v = Assembly.GetExecutingAssembly().GetName().Version;
+        var versionStr = v != null ? $"{v.Major}.{v.Minor}.{v.Build}" : "0.1.0";
+        Text = $"ETTerms   Version v{versionStr}";
     }
 
     private void BuildLayout()
@@ -74,6 +89,7 @@ public partial class MainForm : Form
 
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
+        _bridge.Dispose();
         AppSettings.Instance.SaveWindowPosition(this);
         AppLogger.LogApplicationClose();
         base.OnFormClosed(e);

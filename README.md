@@ -66,9 +66,9 @@
   - Script commands: `pduconnect` / `pductrl`
 
 - 🤖 **AI / MCP integration (optional, planned)**
-  - A standalone stdio **Serial MCP server** exposes the serial port as AI-callable tools for **Kiro CLI / Claude CLI**
-  - Tools: `serial_list` / `serial_open` / `serial_write` / `serial_read` / `serial_close`
-  - Just tell the AI to open a COM port, send a command, and read the reply
+  - The **GUI owns the COM port**; a standalone stdio **Serial MCP server** bridges to it over a local named pipe for **Kiro CLI / Claude CLI**
+  - Tools: `serial_list` / `serial_attach` / `serial_write` / `serial_read` / `serial_detach`
+  - AI's serial TX/RX shows live in the GUI tagged `[AI]` — open the port in the GUI first, then let the AI attach
 
 - 📊 **Session RX logging**
   - `logopen` / `logwrite` / `logclose` write session output to file
@@ -271,19 +271,21 @@ wait 'login: '
 
 ## 🤖 AI / MCP Integration
 
-> 🔜 **Planned (Phase 9).** Let AI agents (**Kiro CLI / Claude CLI**) drive the serial port directly — issue commands and read output.
+> 🔜 **Planned (Phase 9).** Let AI agents (**Kiro CLI / Claude CLI**) send/receive on a serial port **while you watch it live in the ETTerms GUI**.
 
-ETTerms ships a standalone **stdio MCP server** (`src/ETTerms.SerialMcp/`) that wraps the serial port as AI-callable tools. It runs as its own process, kept alive by the MCP client for the whole session, so it holds the COM port open across calls and can capture asynchronous device output.
+**Key design: the GUI owns the COM port; the MCP server never opens it.** A COM port can be opened by only one process at a time, so rather than the MCP server grabbing it, the GUI is the sole owner and runs a local **named pipe server** (`SerialBridgeServer`). The standalone `ETTerms.SerialMcp` (launched by Kiro/Claude CLI) is a thin client: every `write` / `read` is forwarded over the pipe to the GUI, which does the real port I/O. AI's TX is echoed into the terminal tagged `[AI]`, so RX/TX flow through the GUI channel and what you see is exactly what the AI sees.
 
-> **Why a separate process?** Each CLI shell command is a fresh process, so `open→write→read` can't keep state across calls. A long-lived MCP server maintains one connection and accumulates received bytes.
+Full closed loop — all inside the ETTerms GUI:
+- **Tab 1:** a Serial session holding e.g. COM3 (shows traffic live; AI's writes tagged `[AI]`)
+- **Tab 2:** a PowerShell (ConPTY) tab running `kiro-cli`, which spawns `ETTerms.SerialMcp`, which connects back to the pipe
 
 | Tool | Params | Description |
 |------|--------|-------------|
-| `serial_list` | — | List available COM ports |
-| `serial_open` | portName, baudRate, dataBits, parity, stopBits, handshake, newLine | Open and hold the port |
-| `serial_write` | text, appendNewLine? | Send text (optional newline) |
-| `serial_read` | waitFor?, timeoutMs? | Drain the RX buffer; optionally wait for a string / timeout |
-| `serial_close` | — | Close the port |
+| `serial_list` | — | List serial sessions currently **open in the GUI** (name + baud) |
+| `serial_attach` | portName | Bind to a GUI serial session by COM name (required before write/read) |
+| `serial_write` | text, appendNewline? | Send text via the GUI (shown live tagged `[AI]`) |
+| `serial_read` | waitFor?, timeoutMs? | Drain accumulated RX; optionally wait for a substring / timeout |
+| `serial_detach` | — | Unbind (does **not** close the GUI's port) |
 
 Register in Kiro CLI:
 
@@ -291,9 +293,11 @@ Register in Kiro CLI:
 kiro-cli mcp add --name serial --command dotnet --args "run --project src\ETTerms.SerialMcp\ETTerms.SerialMcp.csproj"
 ```
 
-Or add it to `agent.json` under `mcpServers` (Claude CLI uses an equivalent `mcpServers` config). Then just tell the AI: *"list COM ports, open COM3 at 115200, send `AT` and read the reply."*
+Or add it to `agent.json` under `mcpServers` (Claude CLI uses an equivalent `mcpServers` config). **Open the target serial connection in the ETTerms GUI first**, then tell the AI: *"list serial sessions, attach to COM3, send `AT` and read the reply."*
 
-> ⚠️ A COM port can be opened by only one process at a time — don't open the same port in both the GUI and the MCP server.
+> ⚠️ The COM port is owned solely by the GUI. The MCP server attaches over the pipe — it never opens the port itself, so there's no GUI-vs-server conflict.
+
+📖 Step-by-step setup: [docs/serial-mcp-guide.md](docs/serial-mcp-guide.md).
 
 ---
 

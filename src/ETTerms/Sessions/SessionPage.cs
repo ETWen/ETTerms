@@ -24,6 +24,7 @@ public sealed class SessionPage : UserControl
     private readonly Button _run, _stop, _log;
     private bool _started;
     private SessionLogger? _logger;
+    private SerialBridgeEndpoint? _bridge;   // Serial 才有：供 MCP 橋接
 
     /// <summary>底層連線通道。</summary>
     public ISessionChannel Channel => _channel;
@@ -216,6 +217,11 @@ public sealed class SessionPage : UserControl
         {
             _channel.Open();
             SessionManager.Register(_channel);
+            if (_channel is SerialChannel sc)
+            {
+                _bridge = new SerialBridgeEndpoint(sc.LogName, sc.BaudRate, WriteFromAi);
+                SerialBridge.Register(_bridge);
+            }
         }
         catch (Exception ex)
         {
@@ -228,9 +234,19 @@ public sealed class SessionPage : UserControl
     {
         // 側錄不依賴 UI thread，直接在背景緒寫檔（SessionLogger 內部自鎖）。
         _logger?.Write(data);
+        _bridge?.FeedRx(data);   // 轉發給 MCP（若有 attach）
         if (IsDisposed || !IsHandleCreated) return;
         if (InvokeRequired) BeginInvoke(() => _term.Feed(data));
         else _term.Feed(data);
+    }
+
+    /// <summary>MCP 來源寫入：送出實體 port，並把內容以 [AI] 標色 echo 回終端機，使用者即時可見。</summary>
+    private void WriteFromAi(string text, bool appendNewline)
+    {
+        if (_channel is not SerialChannel sc) return;
+        _channel.Write(System.Text.Encoding.UTF8.GetBytes(appendNewline ? text + sc.NewLine : text));
+        var echo = System.Text.Encoding.UTF8.GetBytes($"\x1b[35m[AI]\x1b[0m {text}\r\n");
+        Ui(() => _term.Feed(echo));
     }
 
     protected override void Dispose(bool disposing)
@@ -239,6 +255,7 @@ public sealed class SessionPage : UserControl
         {
             _runner.Cancel();
             _channel.DataReceived -= OnDataReceived;
+            if (_bridge != null) { SerialBridge.Unregister(_bridge); _bridge = null; }
             _logger?.Dispose();
             _logger = null;
             SessionManager.Unregister(_channel);

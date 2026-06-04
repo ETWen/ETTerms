@@ -3,7 +3,7 @@ using System.Drawing;
 namespace ETTerms.Terminal;
 
 [Flags]
-public enum CellAttr : byte { None = 0, Bold = 1, Underline = 2, Inverse = 4 }
+public enum CellAttr : byte { None = 0, Bold = 1, Underline = 2, Inverse = 4, Wide = 8, WideTrail = 16 }
 
 public struct Cell
 {
@@ -80,11 +80,37 @@ public sealed class ScreenBuffer
     // ── 輸出字元 ─────────────────────────────────────────────
     public void Print(char ch)
     {
+        int w = CharWidth(ch);
         if (_wrapPending) { _wrapPending = false; CursorCol = 0; LineFeed(); }
         if (CursorRow < 0 || CursorRow >= Rows) CursorRow = Math.Clamp(CursorRow, 0, Rows - 1);
-        _screen[CursorRow][CursorCol] = new Cell { Ch = ch, Fg = PenFg, Bg = PenBg, Attr = PenAttr };
-        if (CursorCol >= Cols - 1) { if (AutoWrap) _wrapPending = true; }
-        else CursorCol++;
+
+        // 寬字(全形 CJK)占 2 格；行尾剩 1 格放不下 → 先換行
+        if (w == 2 && CursorCol == Cols - 1) { CursorCol = 0; LineFeed(); }
+
+        _screen[CursorRow][CursorCol] = new Cell { Ch = ch, Fg = PenFg, Bg = PenBg, Attr = w == 2 ? PenAttr | CellAttr.Wide : PenAttr };
+        if (w == 2 && CursorCol + 1 < Cols)
+            _screen[CursorRow][CursorCol + 1] = new Cell { Ch = '\0', Fg = PenFg, Bg = PenBg, Attr = PenAttr | CellAttr.WideTrail };
+
+        if (CursorCol + w >= Cols) { if (AutoWrap) _wrapPending = true; else CursorCol = Cols - 1; }
+        else CursorCol += w;
+    }
+
+    /// <summary>東亞全形 / 寬字回傳 2，其餘 1（BMP 範圍，足夠涵蓋常見中日韓）。</summary>
+    private static int CharWidth(char ch)
+    {
+        if (ch < 0x1100) return 1;
+        return (ch <= 0x115F)                       // Hangul Jamo
+            || (ch >= 0x2E80 && ch <= 0x303E)       // CJK 部首 / 康熙 / 符號
+            || (ch >= 0x3041 && ch <= 0x33FF)       // 平假名 / 片假名 / CJK 符號
+            || (ch >= 0x3400 && ch <= 0x4DBF)       // CJK 擴充 A
+            || (ch >= 0x4E00 && ch <= 0x9FFF)       // CJK 基本
+            || (ch >= 0xA000 && ch <= 0xA4CF)       // 彝文
+            || (ch >= 0xAC00 && ch <= 0xD7A3)       // 韓文音節
+            || (ch >= 0xF900 && ch <= 0xFAFF)       // CJK 相容表意
+            || (ch >= 0xFE30 && ch <= 0xFE4F)       // CJK 相容形式
+            || (ch >= 0xFF00 && ch <= 0xFF60)       // 全形 ASCII
+            || (ch >= 0xFFE0 && ch <= 0xFFE6)       // 全形符號
+            ? 2 : 1;
     }
 
     // ── 游標 / 換行 ──────────────────────────────────────────
