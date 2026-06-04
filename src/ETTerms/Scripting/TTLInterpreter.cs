@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using ETTerms.Scripting.Pdu;
@@ -105,7 +106,7 @@ public sealed class TTLInterpreter : IDisposable
             && !original.StartsWith("if ") && !original.StartsWith("elseif ");
 
         string command = GetCommand(line).ToLower();
-        if (!isAssignment && command != "while" && command != "if")
+        if (!isAssignment && command != "while" && command != "if" && command != "sprintf2")
             line = ReplaceVariables(line);
 
         if (line.StartsWith(":")) return;   // label
@@ -124,6 +125,7 @@ public sealed class TTLInterpreter : IDisposable
             case "logwrite": LogWrite(args); break;
             case "logclose": LogClose(); break;
             case "messagebox": ShowMessageBox(args); break;
+            case "sprintf2": ExecuteSprintf2(args); break;
             case "waitall": ExecuteWaitAll(args); break;
             case "sendlnall": ExecuteSendlnAll(args); break;
             case "sendlngroup": ExecuteSendlnGroup(args); break;
@@ -516,6 +518,310 @@ public sealed class TTLInterpreter : IDisposable
         string act = action == 1 ? "ON" : "OFF";
         Output?.Invoke($"[pductrl] device {device} port {port} {act} → {(ok ? "OK" : "FAILED")}");
         _logWriter?.WriteLine($"[pductrl] device={device} port={port} action={act} result={_result}");
+    }
+
+    #endregion
+
+    #region sprintf2
+
+    /// <summary>
+    /// <c>sprintf2 strvar FORMAT [ARG ...]</c> — C printf 風格格式化，結果存入字串變數 <c>strvar</c>。
+    /// 與 Tera Term sprintf2 相同：支援 c d i o u x X e E f g G a A s 與旗標 - + 0 # 空白、寬度/精度（含 <c>*</c>）。
+    /// 設定系統變數 result：0 成功、1 缺少格式字串、2 格式無效、3 引數無效、4 目的變數無效。
+    /// 格式字串保持字面值（不展開變數），僅對各引數做變數展開，故 <c>sprintf2 s '%s.' s</c> 可累加自身。
+    /// </summary>
+    private void ExecuteSprintf2(string args)
+    {
+        var tokens = TokenizeArgs(args);
+        if (tokens.Count < 1) { _result = 4; Output?.Invoke("[sprintf2] invalid destination variable"); return; }
+
+        string dest = tokens[0];
+        if (!Regex.IsMatch(dest, @"^[a-zA-Z_][a-zA-Z0-9_]*$"))
+        { _result = 4; Output?.Invoke("[sprintf2] invalid destination variable"); return; }
+
+        if (tokens.Count < 2) { _result = 1; Output?.Invoke("[sprintf2] no format string"); return; }
+
+        string format = StripQuotes(tokens[1]);
+        var fmtArgs = new List<string>();
+        for (int k = 2; k < tokens.Count; k++) fmtArgs.Add(ReplaceVariables(StripQuotes(tokens[k])));
+
+        try
+        {
+            _vars[dest] = CFormat(format, fmtArgs);
+            _result = 0;
+        }
+        catch (FormatException) { _result = 2; Output?.Invoke("[sprintf2] invalid format"); }
+        catch (ArgumentException) { _result = 3; Output?.Invoke("[sprintf2] invalid argument"); }
+    }
+
+    private static string CFormat(string format, IReadOnlyList<string> args)
+    {
+        var sb = new StringBuilder();
+        int ai = 0, i = 0;
+        while (i < format.Length)
+        {
+            char ch = format[i++];
+            if (ch != '%') { sb.Append(ch); continue; }
+            if (i < format.Length && format[i] == '%') { sb.Append('%'); i++; continue; }
+
+            bool left = false, plus = false, space = false, zero = false, alt = false;
+            for (; i < format.Length; i++)
+            {
+                char f = format[i];
+                if (f == '-') left = true;
+                else if (f == '+') plus = true;
+                else if (f == ' ') space = true;
+                else if (f == '0') zero = true;
+                else if (f == '#') alt = true;
+                else break;
+            }
+
+            int width = 0;
+            if (i < format.Length && format[i] == '*')
+            {
+                i++;
+                width = (int)ParseLong(NextArg(args, ref ai));
+                if (width < 0) { left = true; width = -width; }
+            }
+            else while (i < format.Length && char.IsDigit(format[i])) width = width * 10 + (format[i++] - '0');
+
+            int prec = -1;
+            if (i < format.Length && format[i] == '.')
+            {
+                i++;
+                if (i < format.Length && format[i] == '*')
+                { i++; prec = (int)ParseLong(NextArg(args, ref ai)); if (prec < 0) prec = -1; }
+                else { prec = 0; while (i < format.Length && char.IsDigit(format[i])) prec = prec * 10 + (format[i++] - '0'); }
+            }
+
+            if (i >= format.Length) throw new FormatException();
+            char type = format[i++];
+            if (type == '%') { sb.Append('%'); continue; }
+
+            string body = ConvertSpec(type, plus, space, alt, prec,
+                NextArg(args, ref ai), out string prefix, out bool allowZero);
+
+            int pad = width - prefix.Length - body.Length;
+            if (pad < 0) pad = 0;
+            if (left) { sb.Append(prefix).Append(body).Append(' ', pad); }
+            else if (zero && allowZero) { sb.Append(prefix).Append('0', pad).Append(body); }
+            else { sb.Append(' ', pad).Append(prefix).Append(body); }
+        }
+        return sb.ToString();
+    }
+
+    private static string ConvertSpec(char type, bool plus, bool space, bool alt, int prec,
+        string arg, out string prefix, out bool allowZero)
+    {
+        prefix = ""; allowZero = false;
+        switch (type)
+        {
+            case 'd': case 'i':
+            {
+                long v = ParseLong(arg);
+                ulong mag = v < 0 ? (ulong)(-(v + 1)) + 1UL : (ulong)v;
+                string digits = mag.ToString(CultureInfo.InvariantCulture);
+                allowZero = prec < 0;
+                if (prec >= 0) digits = (prec == 0 && mag == 0) ? "" : digits.PadLeft(prec, '0');
+                prefix = v < 0 ? "-" : plus ? "+" : space ? " " : "";
+                return digits;
+            }
+            case 'u':
+            {
+                ulong v = ParseULong(arg);
+                allowZero = prec < 0;
+                string digits = v.ToString(CultureInfo.InvariantCulture);
+                if (prec >= 0) digits = (prec == 0 && v == 0) ? "" : digits.PadLeft(prec, '0');
+                return digits;
+            }
+            case 'o':
+            {
+                ulong v = ParseULong(arg);
+                string digits = (prec == 0 && v == 0) ? "" : ToBase(v, 8, false);
+                if (prec > 0) digits = digits.PadLeft(prec, '0');
+                if (alt && (digits.Length == 0 || digits[0] != '0')) digits = "0" + digits;
+                allowZero = prec < 0;
+                return digits;
+            }
+            case 'x': case 'X':
+            {
+                ulong v = ParseULong(arg);
+                string digits = (prec == 0 && v == 0) ? "" : ToBase(v, 16, type == 'X');
+                if (prec > 0) digits = digits.PadLeft(prec, '0');
+                if (alt && v != 0) prefix = type == 'X' ? "0X" : "0x";
+                allowZero = prec < 0;
+                return digits;
+            }
+            case 'c':
+                return long.TryParse(arg, NumberStyles.Integer, CultureInfo.InvariantCulture, out long code)
+                    ? ((char)code).ToString()
+                    : (arg.Length > 0 ? arg[0].ToString() : "");
+            case 's':
+                return (prec >= 0 && arg.Length > prec) ? arg.Substring(0, prec) : arg;
+            case 'f': case 'F':
+            {
+                double d = ParseDouble(arg);
+                int p = prec < 0 ? 6 : prec;
+                string digits = Math.Abs(d).ToString("F" + p, CultureInfo.InvariantCulture);
+                if (alt && p == 0) digits += ".";
+                prefix = Sign(d, plus, space); allowZero = true;
+                return digits;
+            }
+            case 'e': case 'E':
+            {
+                double d = ParseDouble(arg);
+                int p = prec < 0 ? 6 : prec;
+                string s = FixExponent(Math.Abs(d).ToString((type == 'e' ? "e" : "E") + p, CultureInfo.InvariantCulture));
+                if (alt && p == 0 && !s.Contains('.'))
+                {
+                    int ei = s.IndexOfAny(new[] { 'e', 'E' });
+                    s = s.Substring(0, ei) + "." + s.Substring(ei);
+                }
+                prefix = Sign(d, plus, space); allowZero = true;
+                return s;
+            }
+            case 'g': case 'G':
+            {
+                double d = ParseDouble(arg);
+                int p = prec < 0 ? 6 : (prec == 0 ? 1 : prec);
+                double ad = Math.Abs(d);
+                string etmp = ad.ToString("E" + (p - 1), CultureInfo.InvariantCulture);
+                int x = ad == 0 ? 0 : int.Parse(etmp.Substring(etmp.IndexOf('E') + 1), CultureInfo.InvariantCulture);
+                string s;
+                if (x < -4 || x >= p)
+                {
+                    s = ad.ToString((type == 'g' ? "e" : "E") + (p - 1), CultureInfo.InvariantCulture);
+                    if (!alt) s = TrimGExp(s);
+                    s = FixExponent(s);
+                }
+                else
+                {
+                    int fp = Math.Max(0, p - 1 - x);
+                    s = ad.ToString("F" + fp, CultureInfo.InvariantCulture);
+                    if (!alt) s = TrimTrailingZeros(s);
+                }
+                prefix = Sign(d, plus, space); allowZero = true;
+                return s;
+            }
+            case 'a': case 'A':
+            {
+                double d = ParseDouble(arg);
+                prefix = Sign(d, plus, space); allowZero = true;
+                return HexFloat(Math.Abs(d), type == 'A', prec);
+            }
+            default:
+                throw new FormatException();
+        }
+    }
+
+    private static string Sign(double d, bool plus, bool space) =>
+        double.IsNegative(d) ? "-" : plus ? "+" : space ? " " : "";
+
+    private static string ToBase(ulong v, int b, bool upper)
+    {
+        if (v == 0) return "0";
+        const string digs = "0123456789abcdef";
+        var sb = new StringBuilder();
+        ulong ub = (ulong)b;
+        while (v > 0) { sb.Insert(0, digs[(int)(v % ub)]); v /= ub; }
+        return upper ? sb.ToString().ToUpperInvariant() : sb.ToString();
+    }
+
+    /// <summary>.NET 指數為 3 位數，C 最少 2 位數 — 修剪多餘前導 0 至最少 2 位。</summary>
+    private static string FixExponent(string s)
+    {
+        int ei = s.IndexOfAny(new[] { 'e', 'E' });
+        if (ei < 0 || ei + 2 >= s.Length) return s;
+        string exp = s.Substring(ei + 2).TrimStart('0');
+        if (exp.Length < 2) exp = exp.PadLeft(2, '0');
+        return s.Substring(0, ei + 2) + exp;
+    }
+
+    private static string TrimTrailingZeros(string s)
+    {
+        if (!s.Contains('.')) return s;
+        s = s.TrimEnd('0');
+        return s.EndsWith(".") ? s.Substring(0, s.Length - 1) : s;
+    }
+
+    private static string TrimGExp(string s)
+    {
+        int ei = s.IndexOfAny(new[] { 'e', 'E' });
+        return TrimTrailingZeros(s.Substring(0, ei)) + s.Substring(ei);
+    }
+
+    private static string HexFloat(double d, bool upper, int prec)
+    {
+        long bits = BitConverter.DoubleToInt64Bits(d);
+        int rawExp = (int)((bits >> 52) & 0x7FF);
+        long mant = bits & 0xFFFFFFFFFFFFFL;
+        string lead; int e2;
+        if (rawExp == 0) { lead = "0"; e2 = mant == 0 ? 0 : -1022; }
+        else { lead = "1"; e2 = rawExp - 1023; }
+        string frac = mant.ToString("x13", CultureInfo.InvariantCulture);
+        if (prec >= 0) frac = prec < frac.Length ? frac.Substring(0, prec) : frac.PadRight(prec, '0');
+        else frac = frac.TrimEnd('0');
+        string body = "0x" + lead + (frac.Length > 0 ? "." + frac : "") + "p" + (e2 >= 0 ? "+" : "-") + Math.Abs(e2);
+        return upper ? body.ToUpperInvariant() : body;
+    }
+
+    private static string TokenizeArgsNext(string s, ref int i, int n)
+    {
+        var sb = new StringBuilder();
+        if (s[i] == '\'' || s[i] == '"')
+        {
+            char q = s[i++];
+            sb.Append(q);
+            while (i < n && s[i] != q) sb.Append(s[i++]);
+            if (i < n) sb.Append(s[i++]);
+        }
+        else while (i < n && !char.IsWhiteSpace(s[i])) sb.Append(s[i++]);
+        return sb.ToString();
+    }
+
+    private static List<string> TokenizeArgs(string s)
+    {
+        var list = new List<string>();
+        int i = 0, n = s.Length;
+        while (i < n)
+        {
+            while (i < n && char.IsWhiteSpace(s[i])) i++;
+            if (i >= n) break;
+            list.Add(TokenizeArgsNext(s, ref i, n));
+        }
+        return list;
+    }
+
+    private static string StripQuotes(string s) =>
+        s.Length >= 2 && (s[0] == '\'' || s[0] == '"') && s[^1] == s[0]
+            ? s.Substring(1, s.Length - 2) : s;
+
+    private static string NextArg(IReadOnlyList<string> args, ref int ai)
+    {
+        if (ai >= args.Count) throw new ArgumentException("not enough arguments");
+        return args[ai++];
+    }
+
+    private static long ParseLong(string s)
+    {
+        s = s.Trim();
+        if (long.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out long v)) return v;
+        if ((s.StartsWith("0x") || s.StartsWith("0X")) &&
+            long.TryParse(s.Substring(2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out long h)) return h;
+        if (double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out double d)) return (long)d;
+        throw new ArgumentException("invalid integer argument");
+    }
+
+    private static ulong ParseULong(string s)
+    {
+        long v = ParseLong(s);
+        return unchecked((ulong)v);
+    }
+
+    private static double ParseDouble(string s)
+    {
+        if (double.TryParse(s.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out double d)) return d;
+        throw new ArgumentException("invalid floating-point argument");
     }
 
     #endregion

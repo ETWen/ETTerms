@@ -1,43 +1,422 @@
 # ETTerms
 
-原生 Windows 終端機工作台（C# .NET 8 WinForms），支援 **SSH** 與 **Serial Port** 連線，
-並內建從 MyTeraTerm 移植的 **TTL 腳本引擎**做自動化。單機、無雲、無登入系統。
+[![English](https://img.shields.io/badge/English-2ea043.svg)](README.md) [![繁體中文](https://img.shields.io/badge/%E7%B9%81%E9%AB%94%E4%B8%AD%E6%96%87-lightgrey.svg)](README.zh-TW.md)
 
-詳細架構見 [ARCHITECTURE.md](ARCHITECTURE.md)。
+> A native Windows terminal workspace (C# .NET 8 WinForms) — **SSH**, **Serial Port**, and **local Shell (ConPTY)** in one window, with a **TTL scripting engine** ported from MyTeraTerm for automation, plus an optional **Serial MCP server** that lets AI agents (Kiro CLI / Claude CLI) drive the serial port directly. Standalone, no cloud, no login.
 
-## 建置 / 執行
+![version](https://img.shields.io/badge/version-0.1.0-blue.svg) ![platform](https://img.shields.io/badge/platform-Windows-0078D6.svg?logo=windows&logoColor=white) ![.NET](https://img.shields.io/badge/.NET-8.0-512BD4.svg?logo=dotnet&logoColor=white) ![UI](https://img.shields.io/badge/UI-WinForms-5C2D91.svg) ![SSH](https://img.shields.io/badge/SSH-SSH.NET-success.svg) ![Serial](https://img.shields.io/badge/Serial-System.IO.Ports-success.svg) ![status](https://img.shields.io/badge/status-WIP-orange.svg) ![license](https://img.shields.io/badge/license-MIT-green.svg)
+
+---
+
+## 📖 Table of Contents
+
+- [✨ Features](#-features)
+- [🖼️ Layout](#️-layout)
+- [💻 System Requirements](#-system-requirements)
+- [📥 Installation](#-installation)
+- [🚀 Quick Start](#-quick-start)
+- [📚 Usage Guide](#-usage-guide)
+- [🤖 TTL Scripting](#-ttl-scripting)
+- [👥 Group Sync Execution](#-group-sync-execution)
+- [⚡ PDU Power Control](#-pdu-power-control)
+- [🤖 AI / MCP Integration](#-ai--mcp-integration)
+- [🔐 Data & Security](#-data--security)
+- [🔧 Troubleshooting](#-troubleshooting)
+- [🔨 Building from Source](#-building-from-source)
+- [📁 Project Structure](#-project-structure)
+- [🤝 Contributing](#-contributing)
+- [📜 Version History](#-version-history)
+- [📄 License](#-license)
+- [🙏 Acknowledgments](#-acknowledgments)
+
+---
+
+## ✨ Features
+
+### Core Functionality
+
+- 🖥️ **Multiple protocols in one workspace**
+  - **SSH** (`SSH.NET`): password / private key / keyboard-interactive auth, with built-in SFTP
+  - **Serial Port** (`System.IO.Ports`): configurable COM port, baud, data bits, parity, stop bits, handshake
+  - **Local Shell** (Windows ConPTY): launch PowerShell / Cmd / Bash directly
+
+- 🪟 **Tiling tabbed workspace**
+  - One-click grid layouts: `1×1 / 1×2 / 2×1 / 2×2 / 2×3 / 3×3`
+  - Per-pane manual split: `↔` horizontal / `↕` vertical, drag splitters to resize proportionally
+  - Each pane hosts its own mini tab strip for multiple connections
+
+- 🗂️ **Editable connection sidebar (Saved Connections)**
+  - Nested folders with connection-count badges, expand / collapse all
+  - Live filter by name / host, matching branches auto-expand
+  - Context menu & toolbar: add / rename / delete, drag to re-categorize
+  - Double-click to open in the active pane; ad-hoc quick connect (not saved)
+
+- 🤖 **TTL script automation**
+  - TTL (Tera Term Language) interpreter ported and extended from MyTeraTerm
+  - Runs `.ttl` against the active session, showing file / line / current command live
+  - Supports `send` / `sendln` / `wait` / `if` / `while` / variable math / file logging
+  - Long-running `wait` / `while` can be aborted anytime with **■ Stop**
+
+- 👥 **Group sync execution**
+  - Assign tabs to Group 1/2/3 and run one script across the whole group at once
+  - Sync commands: `waitall` (barrier), `sendlnall` (send after all arrive), `sendlngroup` (target a member)
+
+- ⚡ **PDU power control (optional)**
+  - Control PDU outlets over SNMP (`SnmpSharpNet`) to power-cycle devices during tests
+  - Script commands: `pduconnect` / `pductrl`
+
+- 🤖 **AI / MCP integration (optional, planned)**
+  - A standalone stdio **Serial MCP server** exposes the serial port as AI-callable tools for **Kiro CLI / Claude CLI**
+  - Tools: `serial_list` / `serial_open` / `serial_write` / `serial_read` / `serial_close`
+  - Just tell the AI to open a COM port, send a command, and read the reply
+
+- 📊 **Session RX logging**
+  - `logopen` / `logwrite` / `logclose` write session output to file
+
+### Terminal Rendering
+
+- 🎨 Owner-drawn VT100 / ANSI control, double-buffered cell grid
+- 🌑 KKTerm-style dark theme (incl. DWM dark title bar)
+- 🔤 Configurable font / size / palette / scrollback
+- 📋 Select / copy / paste
+
+---
+
+## 🖼️ Layout
+
+```
+┌──────┬─────────────────────┬───────────────────────────────────────┐
+│ ▣ T  │ Saved Connections   │  Workspace (tiling)                    │
+│ ▣ S  │  🔍 search          │  ┌─────────────────┬─────────────────┐ │
+│ ▣ ⚙  │  ▾ 📁 Servers (2)   │  │ [tab1][tab2] +  │ [tab1] +        │ │
+│      │     ▸ SSH srv-01    │  │                 │                 │ │
+│ icon │     ▸ SSH nas       │  │   TerminalView  │   TerminalView  │ │
+│ rail │  ▾ 📁 Boards (2)    │  │   (owner-drawn) │   (owner-drawn) │ │
+│      │     ▸ COM3 @115200  │  │                 │                 │ │
+│      │     ▸ COM7 @9600    │  ├─────────────────┴─────────────────┤ │
+│      │                     │  │ [Group1-A]   ▶ Script  ■ Stop     │ │
+└──────┴─────────────────────┴───────────────────────────────────────┘
+  Activity Rail        Sidebar              Tabbed / Tiling Workspace
+```
+
+> The Activity Rail switches the three main views — **Terminal / Scripts / Settings**. The sidebar manages saved connections; the workspace holds multiple sessions across tabs and tiled panes.
+
+---
+
+## 💻 System Requirements
+
+| Item | Requirement |
+|------|-------------|
+| OS | Windows 10 (1809+) / Windows 11 |
+| Runtime | .NET 8 Desktop Runtime (`Microsoft.WindowsDesktop.App 8.0.x`) |
+| Display | 1600×900 or higher recommended |
+| Optional hardware | USB-to-Serial adapter (Serial), SNMP-capable PDU (power control) |
+
+Check the runtime:
 
 ```powershell
+dotnet --list-runtimes | findstr WindowsDesktop
+```
+
+---
+
+## 📥 Installation
+
+Source build for now (no binary release yet).
+
+```powershell
+git clone <repo-url> ETTerms
+cd ETTerms
 dotnet build
 dotnet run --project src\ETTerms\ETTerms.csproj
 ```
 
-## TTL 腳本
+Full steps in [Building from Source](#-building-from-source).
 
-在任一連線分頁頂部的腳本列按 **▶ Script** 載入 `.ttl` 對該連線執行；左側狀態列即時顯示
-執行到的行號與指令，**■ Stop** 可中止。完整語法與範例見
-[docs/ttl-script-reference.md](docs/ttl-script-reference.md)，範例腳本在 `tools/scripts/`。
+---
 
-### 目前支援的指令
+## 🚀 Quick Start
 
-| 指令 | 說明 |
-|------|------|
-| `send '文字'` | 送出文字（不加換行） |
-| `sendln '文字'` | 送出文字並附加 `\r\n` |
-| `wait '字串'` | 一直等到接收緩衝出現該字串才往下（預設無限等待，可按 Stop 取消）；命中後 `result=1` |
-| `flushrecv` | 清空接收緩衝區 |
-| `pause 秒數` | 暫停 N 秒（可被 Stop 中止） |
-| `timeout = 秒數` | 設定 `wait` 逾時秒數；`0`＝無限等待，`N>0` 超時會中止腳本並報錯 |
-| `if … then` / `elseif … then` / `else` / `endif` | 條件分支（可巢狀） |
-| `while …` / `endwhile` | 迴圈（可巢狀，可被 Stop 中止） |
-| `名稱 = 值` | 變數指派；支援 `+ - * /` 整數運算與字串；內建變數 `result` |
-| `logopen '檔名'` | 開啟 log 檔（覆寫） |
-| `logwrite '文字'` | 寫一行到 log |
-| `logclose` | 關閉 log（腳本結束自動關閉） |
-| `messagebox '訊息'` | 跳出對話框（會顯示在最上層） |
-| `; 註解` | 行內註解（`;` 之後到行尾） |
-| `:label` | 標籤行（會被略過） |
+### Create an SSH connection
 
-**條件運算子**（`if` / `elseif` / `while`）：`>=` `<=` `>` `<` `==` `!=` `=`，或無運算子（非零為真）。
+1. Launch ETTerms; on the left Activity Rail switch to **Terminal**
+2. In the sidebar click **＋ New Connection** and pick type **SSH**
+3. Enter `Host` / `Port` (default 22) / `Username`, choose auth (password / private key)
+4. Double-click the connection → opens a tab in the active pane
 
-> `pductrl` / `pduconnect`（SNMP PDU 控制）屬 Phase 7，目前尚未支援。
+### Create a Serial connection
+
+1. Sidebar **＋ New Connection**, type **Serial**
+2. Pick `COM port` and `BaudRate` (e.g. `COM3` / `115200`)
+3. Double-click to open
+
+### Run a TTL script
+
+1. With a tab connected, click **▶ Script** on the script bar and pick a `.ttl`
+2. The left status bar shows the running line and command live
+3. Press **■ Stop** to abort if needed
+
+---
+
+## 📚 Usage Guide
+
+### Activity Rail
+
+Switches the three main views: **Terminal** (workspace), **Scripts** (edit & run), **Settings** (preferences).
+
+### Connection Sidebar (Saved Connections)
+
+| Action | How |
+|--------|-----|
+| Add folder / connection | Toolbar button or context menu |
+| Rename / delete | Context menu |
+| Categorize | Drag a connection or folder into a target folder (cannot drop into its own descendant) |
+| Search | Top search box, live filter by name / host |
+| Open connection | Double-click → opens in the active pane |
+
+### Workspace Tiling
+
+- One-click grid layouts: `1×1 / 1×2 / 2×1 / 2×2 / 2×3 / 3×3`
+- Per-pane actions (top-right): `↔` split horizontally, `↕` split vertically, `＋` new tab, `✕` close
+- Closing a pane collapses the split so siblings fill the space; at least one pane remains
+- The active pane is outlined with an accent border
+
+### Terminal
+
+- Incoming channel bytes → ANSI parser → screen buffer → painted
+- Keyboard input is encoded to byte sequences sent to the remote
+- Supports scrollback, select / copy / paste; font and palette under **Settings**
+
+---
+
+## 🤖 TTL Scripting
+
+On any connection tab's script bar, click **▶ Script** to load a `.ttl` and run it against that connection. Full syntax and examples in
+[docs/ttl-script-reference.md](docs/ttl-script-reference.md); sample scripts in `tools/scripts/`.
+
+### Supported Commands
+
+| Command | Description |
+|---------|-------------|
+| `send 'text'` | Send text (no newline) |
+| `sendln 'text'` | Send text plus `\r\n` |
+| `wait 'string'` | Wait until the string appears in the RX buffer (infinite by default, cancellable via Stop); sets `result=1` on match |
+| `flushrecv` | Clear the RX buffer |
+| `pause seconds` | Pause N seconds (cancellable via Stop) |
+| `timeout = seconds` | `wait` timeout; `0` = infinite, `N>0` aborts the script with an error on timeout |
+| `if … then` / `elseif … then` / `else` / `endif` | Conditional branching (nestable) |
+| `while …` / `endwhile` | Loop (nestable, cancellable via Stop) |
+| `name = value` | Variable assignment; integer `+ - * /` and strings; built-in `result` |
+| `logopen 'file'` | Open a log file (overwrite) |
+| `logwrite 'text'` | Write one line to the log |
+| `logclose` | Close the log (auto-closed at script end) |
+| `messagebox 'msg'` | Show a topmost dialog |
+| `; comment` | Inline comment (from `;` to end of line) |
+| `:label` | Label line (skipped) |
+
+**Comparison operators** (`if` / `elseif` / `while`): `>=` `<=` `>` `<` `==` `!=` `=`, or none (non-zero = true).
+
+### Example: auto login
+
+```ttl
+; tools/scripts/login.ttl
+timeout = 10
+wait 'login: '
+sendln 'root'
+wait 'Password: '
+sendln 'toor'
+wait '# '
+sendln 'uname -a'
+```
+
+---
+
+## 👥 Group Sync Execution
+
+Assign multiple tabs to one Group and run a single script across all of them — ideal for syncing multiple DUTs.
+
+1. **Right-click a tab** → set as Group 1 / 2 / 3 (or clear); the cell footer shows a `[Group1-A]` label
+2. Click **▶ Group1 / ▶ Group2 / ▶ Group3** on the toolbar to run across the whole group
+
+| Command | Description |
+|---------|-------------|
+| `waitall 'string'` | All members wait for the keyword, then continue together (`System.Threading.Barrier`) |
+| `sendlnall 'text'` | Each member sends once all have arrived |
+| `sendlngroup N 'text'` | Only the specified member sends |
+
+> ⚠️ Group sync commands work **only in Run Group mode**; `▶ Script` and `▶ Run All` reject scripts containing them and show a warning.
+
+---
+
+## ⚡ PDU Power Control
+
+Control PDU outlets over SNMP to power-cycle a DUT from within a script.
+
+```ttl
+; connect PDU (device 2 = iPoMan II 1202, IP 192.168.1.21)
+pduconnect 2 192.168.1.21
+
+pductrl 2 1 0      ; turn port 1 off
+pause 5
+pductrl 2 1 1      ; turn port 1 on
+wait 'login: '
+```
+
+| Command | Syntax | Description |
+|---------|--------|-------------|
+| `pduconnect` | `pduconnect <device> <ip>` | Connect to a PDU |
+| `pductrl` | `pductrl <device> <port> <0\|1>` | Set a port off(0) / on(1) |
+
+---
+
+## 🤖 AI / MCP Integration
+
+> 🔜 **Planned (Phase 9).** Let AI agents (**Kiro CLI / Claude CLI**) drive the serial port directly — issue commands and read output.
+
+ETTerms ships a standalone **stdio MCP server** (`src/ETTerms.SerialMcp/`) that wraps the serial port as AI-callable tools. It runs as its own process, kept alive by the MCP client for the whole session, so it holds the COM port open across calls and can capture asynchronous device output.
+
+> **Why a separate process?** Each CLI shell command is a fresh process, so `open→write→read` can't keep state across calls. A long-lived MCP server maintains one connection and accumulates received bytes.
+
+| Tool | Params | Description |
+|------|--------|-------------|
+| `serial_list` | — | List available COM ports |
+| `serial_open` | portName, baudRate, dataBits, parity, stopBits, handshake, newLine | Open and hold the port |
+| `serial_write` | text, appendNewLine? | Send text (optional newline) |
+| `serial_read` | waitFor?, timeoutMs? | Drain the RX buffer; optionally wait for a string / timeout |
+| `serial_close` | — | Close the port |
+
+Register in Kiro CLI:
+
+```powershell
+kiro-cli mcp add --name serial --command dotnet --args "run --project src\ETTerms.SerialMcp\ETTerms.SerialMcp.csproj"
+```
+
+Or add it to `agent.json` under `mcpServers` (Claude CLI uses an equivalent `mcpServers` config). Then just tell the AI: *"list COM ports, open COM3 at 115200, send `AT` and read the reply."*
+
+> ⚠️ A COM port can be opened by only one process at a time — don't open the same port in both the GUI and the MCP server.
+
+---
+
+## 🔐 Data & Security
+
+- **Standalone, no cloud:** connection metadata is stored in a local SQLite file (`%LocalAppData%\ETTerms\ettermsdb.sqlite`); no telemetry is sent.
+- **Passwords never stored in plaintext:** SQLite holds only a `CredentialKey` pointing to **Windows Credential Manager**; actual passwords / key passphrases are accessed via `CredentialVault`.
+- **SSH host keys:** the fingerprint is shown for confirmation on first connect (trust-on-first-use), then compared; mismatches warn.
+- **Logs contain no secrets:** `AppLogger` and `logopen` record only host / port, never credentials.
+- **No `secret/` directory:** a single-user desktop app with no server-side secrets, DB passwords, or compile-time secrets.
+
+---
+
+## 🔧 Troubleshooting
+
+| Issue | Likely cause | Fix |
+|-------|--------------|-----|
+| Startup reports missing runtime | .NET 8 Desktop Runtime not installed | Install `Microsoft.WindowsDesktop.App 8.0.x`; verify with `dotnet --list-runtimes` |
+| Serial connect fails / port busy | COM port held by another app | Close other terminal apps; a COM port can be opened by only one session at a time |
+| SSH auth fails | Wrong credentials / key or host-key mismatch | Check auth settings; verify the host-key fingerprint |
+| Script stuck on `wait` | Expected string never received | Check connection & baud, verify the `wait` string; set `timeout` or press ■ Stop |
+| Group script rejected | Ran a script with Group commands via `▶ Script` | Use **▶ GroupN** instead |
+
+More runbooks in [docs/runbooks/](docs/runbooks/).
+
+---
+
+## 🔨 Building from Source
+
+### Prerequisites
+
+- .NET 8 SDK (or SDK 9/10 + .NET 8 Desktop Runtime)
+- Visual Studio 2022 or VS Code + C# extension
+- Git
+
+### Build & Run
+
+```powershell
+dotnet --list-sdks
+dotnet build
+dotnet run --project src\ETTerms\ETTerms.csproj
+```
+
+### Key NuGet Packages
+
+| Package | Purpose |
+|---------|---------|
+| `SSH.NET` | SSH shell + SFTP |
+| `System.IO.Ports` | Serial connections |
+| `Microsoft.Data.Sqlite` | Connection metadata storage |
+| `SnmpSharpNet` | PDU control (optional) |
+
+### Publish (self-contained=false)
+
+```powershell
+dotnet publish src\ETTerms\ETTerms.csproj -c Release -r win-x64 --self-contained false
+```
+
+---
+
+## 📁 Project Structure
+
+```
+ETTerms/
+├── README.md                 # English (default)
+├── README.zh-TW.md           # Traditional Chinese
+├── ARCHITECTURE.md           # Full architecture doc
+├── CLAUDE.md                 # Project memory & dev commands
+├── ETTerms.slnx
+├── docs/
+│   ├── ttl-script-reference.md   # TTL command reference
+│   └── runbooks/                 # Runbooks / troubleshooting
+├── tools/scripts/            # Sample .ttl scripts
+├── src/ETTerms/              # Main application (WinForms)
+│   ├── App/                  # Window shell: MainForm / ActivityRail / ConnectionSidebar / Workspace
+│   ├── Terminal/             # Owner-drawn VT100: TerminalView / AnsiParser / ScreenBuffer / TerminalInput
+│   ├── Sessions/             # Connection abstraction: ISessionChannel / SshChannel / SerialChannel / ShellChannel
+│   ├── Connections/          # Connection data: Connection / ConnectionStore(SQLite) / CredentialVault
+│   ├── Scripting/            # TTL engine: TTLInterpreter / ScriptRunner / GroupSyncContext / Pdu
+│   └── Infrastructure/       # AppLogger / AppSettings / NativeTheme
+└── src/ETTerms.SerialMcp/    # 🔜 Serial MCP server (stdio) — lets AI agents drive the serial port
+```
+
+**Core design:** every connection implements `ISessionChannel` (`Write(byte[])` + `event DataReceived`). `TerminalView` and `TTLInterpreter` only know this abstraction, so SSH / Serial / Shell look identical to upper layers — the key to "one script engine driving multiple connection types." See [ARCHITECTURE.md](ARCHITECTURE.md).
+
+---
+
+## 🤝 Contributing
+
+1. Fork and create a feature branch: `git checkout -b feature/your-feature`
+2. Follow [Conventional Commits](https://www.conventionalcommits.org/): `feat(serial): add auto-reconnect`
+3. Push and open a Pull Request
+
+**Conventions:** PascalCase types / methods, `_camelCase` private fields, filename = class name; the UI layer depends only on the `ISessionChannel` abstraction; channel I/O runs in the background and all UI updates go back to the UI thread via `Control.Invoke`.
+
+---
+
+## 📜 Version History
+
+### v0.1.0 (in development)
+
+- Phases 1–8 complete: window shell, connection sidebar, tiling workspace, Serial / SSH / local Shell (ConPTY) / SFTP
+- Owner-drawn VT100 terminal rendering
+- TTL scripting engine (ported from MyTeraTerm) + Group sync execution
+- PDU power control (SNMP)
+- Settings / About
+- Packaging TBD
+
+**Planned**
+
+- Phase 9: Serial MCP server (`ETTerms.SerialMcp`) — let AI agents (Kiro CLI / Claude CLI) drive the serial port directly
+
+---
+
+## 📄 License
+
+Licensed under the **MIT License** — see [LICENSE](LICENSE).
+
+---
+
+## 🙏 Acknowledgments
+
+- **[KKTerm](https://github.com/)** — UI design reference (Activity Rail + tabbed workspace + Saved Connections)
+- **MyTeraTerm** — source of the TTL scripting engine and `AppLogger`
+- **[SSH.NET](https://github.com/sshnet/SSH.NET)**, **[SnmpSharpNet](http://www.snmpsharpnet.com/)** — open-source connectivity / SNMP libraries
+- **Microsoft** — .NET 8, WinForms, ConPTY, Credential Manager

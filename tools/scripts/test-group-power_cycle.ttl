@@ -1,0 +1,45 @@
+
+prompt_productOS = "6000#"
+
+ip = "192.168.1.21"    ; PDU IP
+device = 1             ; PDU 裝置編號（iPoMan II/III 以 1 為預設）
+port_1 = 1             ; 要測試的插座埠
+port_2 = 2             ; 要測試的插座埠
+act_off = 0
+act_on = 1
+
+; ── 連線 ──
+
+
+idx = 1
+while idx
+    pduconnect device ip
+    if result == 0 then
+        messagebox 'PDU connect failed — 檢查 IP / 網路 / community'
+    endif
+    ; ── 單埠 OFF → ON 電源循環 ──
+    pause 3
+    pductrl device port_1 act_off
+    pductrl device port_2 act_off
+    pause 3
+    pductrl device port_1 act_on
+    pause 1
+    pductrl device port_2 act_on
+    pause 3
+
+    wait "6000 login:"
+    sendln "admin"
+    wait "Password:"
+    sendln ""
+
+    waitall prompt
+    sendlngroup A "show version"
+    sendlngroup B "show int b"
+    waitall prompt
+    sendlngroup A "show version"
+    sendlngroup B "show int b"
+    waitall prompt
+    sendlngroup A "show int b"
+    sendlngroup B "show version"
+endwhile
+

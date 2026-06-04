@@ -1,4 +1,5 @@
 using System.Net;
+using ETTerms.Infrastructure;
 using SnmpSharpNet;
 
 namespace ETTerms.Scripting.Pdu;
@@ -19,6 +20,7 @@ public sealed class PduController : IDisposable
     public bool CheckConnection()
     {
         var name = SnmpGet(".1.3.6.1.4.1.2468.1.4.2.1.1.4");
+        AppLogger.Info($"[PDU] CheckConnection {_ip}: name='{name ?? "<null>"}'");
         return !string.IsNullOrEmpty(name) && name.Contains("PDU");
     }
 
@@ -44,7 +46,7 @@ public sealed class PduController : IDisposable
         try
         {
             var param = new AgentParameters(new OctetString(Community)) { Version = SnmpVersion.Ver1 };
-            var target = new UdpTarget((IPAddress)new IpAddress(_ip), SnmpPort, Timeout, 1);
+            using var target = new UdpTarget((IPAddress)new IpAddress(_ip), SnmpPort, Timeout, 1);
             var pdu = new SnmpSharpNet.Pdu(PduType.Set);
             pdu.VbList.Add(new Oid(oid), value);
             var result = (SnmpV1Packet)target.Request(pdu, param);
@@ -58,14 +60,15 @@ public sealed class PduController : IDisposable
         try
         {
             var param = new AgentParameters(new OctetString(Community)) { Version = SnmpVersion.Ver1 };
-            var target = new UdpTarget((IPAddress)new IpAddress(_ip), SnmpPort, Timeout, 1);
+            using var target = new UdpTarget((IPAddress)new IpAddress(_ip), SnmpPort, Timeout, 1);
             var pdu = new SnmpSharpNet.Pdu(PduType.Get);
             pdu.VbList.Add(new Oid(oid));
             var result = (SnmpV1Packet)target.Request(pdu, param);
-            if (result?.Pdu.ErrorStatus == 0)
-                foreach (var v in result.Pdu.VbList) return v.Value.ToString();
+            if (result == null) { AppLogger.LogWarning($"[PDU] SNMP GET {oid}: no response (timeout)"); return null; }
+            if (result.Pdu.ErrorStatus != 0) { AppLogger.LogWarning($"[PDU] SNMP GET {oid}: ErrorStatus={result.Pdu.ErrorStatus}"); return null; }
+            foreach (var v in result.Pdu.VbList) return v.Value.ToString();
         }
-        catch { }
+        catch (Exception ex) { AppLogger.LogError($"[PDU] SNMP GET {oid} exception", ex); }
         return null;
     }
 

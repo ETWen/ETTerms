@@ -1,0 +1,25 @@
+; sprintf2 範例 / 自我測試
+; 在任一已連線 session 執行；結果以 messagebox 顯示
+
+sprintf2 ver 'Tera Term 4.%d' 51
+messagebox ver
+
+sprintf2 win 'Windows %d (+%s)' 2000 'SP4'
+messagebox win
+
+sprintf2 test '%s=%d %s=0x%x' 'dec' 10 'hex' 33
+messagebox test
+
+; 寬度 / 補零 / 精度
+sprintf2 pad '[%05d] [%-8s] [%+.2f]' -42 'hi' '3.14159'
+messagebox pad
+
+; 累加自身（格式字串保持字面值，引數才展開變數）
+sprintf2 acc '%s' 'start'
+sprintf2 acc '%s-A' acc
+sprintf2 acc '%s-B' acc
+messagebox acc
+
+; result 狀態：0=成功
+sprintf2 ok '%d' 1
+messagebox result

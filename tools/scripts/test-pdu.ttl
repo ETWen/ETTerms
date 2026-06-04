@@ -1,0 +1,22 @@
+; test-pdu.ttl — PDU 控制指令測試（iPoMan II/III via SNMP）
+; 不需 active session 的回應；pduconnect / pductrl 走 SNMP 直連 PDU。
+; 執行前請改下方 ip / device / port 為實際值。執行中可按 Stop 中止。
+
+ip = "192.168.1.21"   ; PDU IP
+device = 1             ; PDU 裝置編號（iPoMan II/III 以 1 為預設）
+port = 1               ; 要測試的插座埠
+act_off = 0
+act_on = 1
+
+
+; ── 連線 ──
+pduconnect device ip
+if result == 0 then
+    messagebox 'PDU connect failed — 檢查 IP / 網路 / community'
+endif
+
+; ── 單埠 OFF → ON 電源循環 ──
+pductrl device port act_off
+pause 3
+pductrl device port act_on
+pause 3

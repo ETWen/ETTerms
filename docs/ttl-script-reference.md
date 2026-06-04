@@ -33,6 +33,7 @@
 | `logwrite` | `logwrite '文字'` | 寫一行到 log 檔。 |
 | `logclose` | `logclose` | 關閉 log 檔（腳本結束時自動關閉）。 |
 | `messagebox` | `messagebox '訊息'` | 跳出訊息對話框。 |
+| `sprintf2` | `sprintf2 變數 格式 [引數 ...]` | C `printf` 風格格式化，結果存入字串變數。詳見下方說明。 |
 | `if` / `elseif` / `else` / `endif` | 見下 | 條件分支（可巢狀）。 |
 | `while` / `endwhile` | 見下 | 迴圈（可巢狀，可被 Stop 中止）。 |
 | `名稱 = 值` | `idx = 0` | 變數指派，支援 `+ - * /` 整數運算與字串。 |
@@ -95,6 +96,37 @@ sendlnall 'y'
 | （無運算子） | 非零為真 | `if result then` |
 
 `then` 關鍵字可省略。
+
+---
+
+## sprintf2 格式化
+
+`sprintf2 變數 格式字串 [引數 ...]` 以 C 語言 `printf` 規則格式化，結果存入指定字串變數，與
+Tera Term 的 `sprintf2` 行為一致。
+
+```ttl
+sprintf2 ver 'Tera Term 4.%d' 51            ; ver = "Tera Term 4.51"
+sprintf2 win 'Windows %d (+%s)' 2000 'SP4'   ; win = "Windows 2000 (+SP4)"
+sprintf2 test '%s=%d %s=0x%x' 'dec' 10 'hex' 33   ; test = "dec=10 hex=0x21"
+messagebox test
+```
+
+- **轉換型別**：`c d i o u x X e E f g G a A s`
+- **旗標**：`-`（靠左）、`+`（顯示正負號）、`0`（補零）、`#`（替代格式，如 `0x`）、空白（正數前空格）
+- **寬度／精度**：十進位整數，或用 `*` 從引數動態取得（如 `%*d`、`%.*f`）
+- 浮點數須以**字串**傳入（TTL 無浮點型別），例 `sprintf2 s '%.2f' '3.14159'`
+- **格式字串不展開變數**（保持字面值），僅各引數會展開變數，故可累加自身：
+  `sprintf2 s '%s,' s` 會把 `s` 接上 `,`
+
+執行後設定系統變數 `result`：
+
+| 值 | 狀態 |
+|----|------|
+| 0 | 格式化成功 |
+| 1 | 缺少格式字串 |
+| 2 | 格式無效 |
+| 3 | 引數無效（缺少或無法解析） |
+| 4 | 目的變數名稱無效 |
 
 ---
 

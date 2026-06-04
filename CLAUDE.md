@@ -8,7 +8,7 @@ ETTerms 是一個 **C# .NET 8 WinForms** 的原生 Windows 終端機工作台，
 
 **開發策略：GUI 先行** — 先把視窗外殼 + 分頁 + 連線清單做出來，再逐步補 Serial → SSH → VT100 → 腳本引擎 → Settings/About → PDU/Shell/SFTP。
 
-**進度：** Phase 1–5 ✅、Phase 6 ✅（TTL 引擎 + Group 同步，SSH 待驗收）、Phase 7 ✅（Settings/About）、Phase 8 ✅（PDU + Shell/ConPTY + SFTP + Settings 擴充）。打包待指示。
+**進度：** Phase 1–5 ✅、Phase 6 ✅（TTL 引擎 + Group 同步，SSH 待驗收）、Phase 7 ✅（Settings/About）、Phase 8 ✅（PDU + Shell/ConPTY + SFTP + Settings 擴充）、Phase 9 🔜（Serial MCP server，讓 AI 直接操作 serial）。打包待指示。
 
 ## 技術棧
 
@@ -21,6 +21,7 @@ ETTerms 是一個 **C# .NET 8 WinForms** 的原生 Windows 終端機工作台，
 - **連線儲存：** SQLite（`Microsoft.Data.Sqlite`）
 - **密碼儲存：** Windows Credential Manager（不落地明碼）
 - **PDU：** SnmpSharpNet（iPoMan II/III via SNMP）
+- **AI / MCP（選用）：** 獨立 stdio MCP server（`ETTerms.SerialMcp`，官方 C# SDK `ModelContextProtocol`）把 serial port 暴露給 Kiro CLI / Claude CLI
 - **設定持久化：** JSON → `%LocalAppData%\ETTerms\settings.json`
 
 ## 常用指令
@@ -35,6 +36,9 @@ dotnet add src\ETTerms package SSH.NET
 
 # 打包
 dotnet publish src\ETTerms\ETTerms.csproj -c Release -r win-x64 --self-contained false
+
+# 註冊 Serial MCP server（給 AI agent 操作 serial）
+kiro-cli mcp add --name serial --command dotnet --args "run --project src\ETTerms.SerialMcp\ETTerms.SerialMcp.csproj"
 ```
 
 ## 開發慣例
@@ -51,11 +55,14 @@ dotnet publish src\ETTerms\ETTerms.csproj -c Release -r win-x64 --self-contained
 - 🚫 **不嵌 TeraTerm、不依賴 com0com** —— ETTerms 走全原生（這是與舊版 MyTeraTerm 的關鍵差異）。
 - 🚫 不要把 `For_AI/` 內容 commit 進 git。
 - ⚠️ Serial COM port 同時只能被一個 session 開啟，開啟前檢查可用性。
+- ⚠️ Serial MCP server（`ETTerms.SerialMcp`）與 GUI **不可同時開同一個 COM port**；AI 操作該 port 前，先關掉 GUI 對它的連線（反之亦然）。
 - ⚠️ VT 相容性以常見情境（VT100 / 常見 ANSI）為主，冷門 escape 後補，不阻塞 GUI 進度。
 - ⚠️ 本專案**無伺服端祕密 / 無 DB 密碼 / 無 EC2 / 無 VM**，因此不套用 AWS / VirtualBox 部署流程。
 - ⚠️ Group 同步指令（`waitall` / `sendlnall` / `sendlngroup`）**只能在 Run Group 模式**使用；`▶ Script` 和 `▶ Run All` 須拒絕含這些指令的腳本。
 
 ## 資料夾用途
 
+- **`src/ETTerms/`** — 主應用程式（WinForms 視窗外殼 + 連線 / 終端機 / 腳本引擎）。
+- **`src/ETTerms.SerialMcp/`** — 🔜 獨立 stdio MCP server（給 AI agent 直接操作 serial），與 WinForms 主程式各自獨立行程；net8.0 console + `ModelContextProtocol` SDK。
 - **`For_AI/`** — AI 協作素材與**參考專案**（`KKTerm-main` UI 參考、`MyTeraTerm` Script 參考）。整個資料夾 gitignored，僅供開發對照。
 - 本專案**無 `secret/` 資料夾**：沒有伺服端祕密 / DB 密碼 / compile-time secret，連線密碼一律走 Windows Credential Manager。

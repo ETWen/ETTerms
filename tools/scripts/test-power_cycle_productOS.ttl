@@ -1,0 +1,44 @@
+
+prompt_ProductOS = "6000# "
+
+ip = "192.168.1.21"   ; PDU IP
+device = 1             ; PDU 裝置編號（iPoMan II/III 以 1 為預設）
+port = 1               ; 要測試的插座埠
+act_off = 0
+act_on = 1
+
+; ── 連線 ──
+pduconnect device ip
+if result == 0 then
+    messagebox 'PDU connect failed — 檢查 IP / 網路 / community'
+endif
+
+cnt_total = 0
+while 1
+    ; ── 單埠 OFF → ON 電源循環 ──
+    flushrecv                      ; 清掉上一輪殘留輸出，等待 boot 訊息更乾淨
+    pause 3
+    pductrl device port act_off
+    pause 5
+    pductrl device port act_on
+    pause 3
+
+    wait "6000 login:"
+    sendln "admin"
+    wait "Password: "
+    sendln ""
+
+    wait prompt_ProductOS
+    sendln "show version"
+    wait prompt_ProductOS
+    sendln "show int b"
+    wait prompt_ProductOS
+    sendln "show int b"
+    wait prompt_ProductOS
+    
+    cnt_total = cnt_total + 1
+    sprintf2 total_print "====== Total Power Cycle :%d ======" cnt_total
+	sendln total_print
+    wait prompt_ProductOS
+endwhile
+
