@@ -21,6 +21,8 @@ public sealed class TTLInterpreter : IDisposable
     private readonly StringBuilder _recv = new();
     private readonly CancellationTokenSource _cts = new();
 
+    private const int SettleMs = 300;   // wait 命中關鍵字後，需連續安靜這麼久（無新資料）才接受，避免比對到輸出中途的回顯
+
     private GroupSyncContext? _groupSync;
     private string _groupMemberLabel = "";
     private readonly Dictionary<int, PduController> _pdus = new();
@@ -351,18 +353,10 @@ public sealed class TTLInterpreter : IDisposable
         while (true)
         {
             ThrowIfCancelled();
-            lock (_recv)
-            {
-                string buf = _recv.ToString();
-                int idx = buf.IndexOf(text, StringComparison.Ordinal);
-                if (idx >= 0)
-                {
-                    _result = 1;
-                    _recv.Clear();
-                    _recv.Append(buf.Substring(idx + text.Length));
-                    return;
-                }
-            }
+            bool found;
+            lock (_recv) found = _recv.ToString().IndexOf(text, StringComparison.Ordinal) >= 0;
+            if (found && SettleAndConsume(text)) return;
+
             // 只有在明確設定 timeout(>0) 且超時才中止腳本；否則一直等到關鍵字出現或被取消。
             if (_timeout > 0 && elapsed >= _timeout)
             {
@@ -373,6 +367,33 @@ public sealed class TTLInterpreter : IDisposable
             Thread.Sleep(100);
             elapsed += 100;
         }
+    }
+
+    /// <summary>
+    /// 找到關鍵字後，等待裝置「安靜」（<see cref="SettleMs"/> 內無新資料進來）才接受，
+    /// 並消費到「最後一次」出現處。若 settle 期間又有資料進來，視為輸出尚未結束
+    /// （命中的可能是夾在輸出中的指令回顯，如 <c>SVOS&gt; help</c>），回傳 false 讓外層續等到真正的就緒提示。
+    /// </summary>
+    private bool SettleAndConsume(string text)
+    {
+        int len;
+        lock (_recv) len = _recv.Length;
+        for (int waited = 0; waited < SettleMs; waited += 50)
+        {
+            ThrowIfCancelled();
+            Thread.Sleep(50);
+            lock (_recv) if (_recv.Length != len) return false;   // 又有新資料 → 還沒安靜
+        }
+        lock (_recv)
+        {
+            string buf = _recv.ToString();
+            int idx = buf.LastIndexOf(text, StringComparison.Ordinal);
+            if (idx < 0) return false;
+            _result = 1;
+            _recv.Clear();
+            _recv.Append(buf.Substring(idx + text.Length));
+        }
+        return true;
     }
 
     private void FlushReceive()
