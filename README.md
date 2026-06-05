@@ -4,7 +4,7 @@
 
 > A native Windows terminal workspace (C# .NET 8 WinForms) — **SSH**, **Serial Port**, and **local Shell (ConPTY)** in one window, with a **TTL scripting engine** ported from MyTeraTerm for automation, plus an optional **Serial MCP server** that lets AI agents (Kiro CLI / Claude CLI) drive the serial port directly. Standalone, no cloud, no login.
 
-![version](https://img.shields.io/badge/version-0.1.0-blue.svg) ![platform](https://img.shields.io/badge/platform-Windows-0078D6.svg?logo=windows&logoColor=white) ![.NET](https://img.shields.io/badge/.NET-8.0-512BD4.svg?logo=dotnet&logoColor=white) ![UI](https://img.shields.io/badge/UI-WinForms-5C2D91.svg) ![SSH](https://img.shields.io/badge/SSH-SSH.NET-success.svg) ![Serial](https://img.shields.io/badge/Serial-System.IO.Ports-success.svg) ![status](https://img.shields.io/badge/status-WIP-orange.svg) ![license](https://img.shields.io/badge/license-MIT-green.svg)
+![version](https://img.shields.io/badge/version-0.2.1-blue.svg) ![platform](https://img.shields.io/badge/platform-Windows-0078D6.svg?logo=windows&logoColor=white) ![.NET](https://img.shields.io/badge/.NET-8.0-512BD4.svg?logo=dotnet&logoColor=white) ![UI](https://img.shields.io/badge/UI-WinForms-5C2D91.svg) ![SSH](https://img.shields.io/badge/SSH-SSH.NET-success.svg) ![Serial](https://img.shields.io/badge/Serial-System.IO.Ports-success.svg) ![status](https://img.shields.io/badge/status-beta-yellow.svg) ![license](https://img.shields.io/badge/license-MIT-green.svg)
 
 ---
 
@@ -65,10 +65,11 @@
   - Control PDU outlets over SNMP (`SnmpSharpNet`) to power-cycle devices during tests
   - Script commands: `pduconnect` / `pductrl`
 
-- 🤖 **AI / MCP integration (optional, planned)**
+- 🤖 **AI / MCP integration (optional)**
   - The **GUI owns the COM port**; a standalone stdio **Serial MCP server** bridges to it over a local named pipe for **Kiro CLI / Claude CLI**
   - Tools: `serial_list` / `serial_attach` / `serial_write` / `serial_read` / `serial_detach`
   - AI's serial TX/RX shows live in the GUI tagged `[AI]` — open the port in the GUI first, then let the AI attach
+  - **One-click setup** in **Settings → AI MCP**: register the server into Claude Code / Kiro with a single button
 
 - 📊 **Session RX logging**
   - `logopen` / `logwrite` / `logclose` write session output to file
@@ -271,7 +272,7 @@ wait 'login: '
 
 ## 🤖 AI / MCP Integration
 
-> 🔜 **Planned (Phase 9).** Let AI agents (**Kiro CLI / Claude CLI**) send/receive on a serial port **while you watch it live in the ETTerms GUI**.
+> Let AI agents (**Kiro CLI / Claude CLI**) send/receive on a serial port **while you watch it live in the ETTerms GUI**.
 
 **Key design: the GUI owns the COM port; the MCP server never opens it.** A COM port can be opened by only one process at a time, so rather than the MCP server grabbing it, the GUI is the sole owner and runs a local **named pipe server** (`SerialBridgeServer`). The standalone `ETTerms.SerialMcp` (launched by Kiro/Claude CLI) is a thin client: every `write` / `read` is forwarded over the pipe to the GUI, which does the real port I/O. AI's TX is echoed into the terminal tagged `[AI]`, so RX/TX flow through the GUI channel and what you see is exactly what the AI sees.
 
@@ -287,7 +288,11 @@ Full closed loop — all inside the ETTerms GUI:
 | `serial_read` | waitFor?, timeoutMs? | Drain accumulated RX; optionally wait for a substring / timeout |
 | `serial_detach` | — | Unbind (does **not** close the GUI's port) |
 
-Register in Kiro CLI:
+### One-click setup (recommended)
+
+In **Settings → AI MCP**, click **Setup** on the Claude Code or Kiro card to register the Serial MCP server into that CLI's user-level config (`~/.claude.json` / `~/.kiro/settings/mcp.json`) with a single button. Your other MCP servers are preserved, and each card shows the CLI command to verify the connection. **Remove** unregisters it.
+
+### Manual setup
 
 ```powershell
 kiro-cli mcp add --name serial --command dotnet --args "run --project src\ETTerms.SerialMcp\ETTerms.SerialMcp.csproj"
@@ -377,8 +382,8 @@ ETTerms/
 │   ├── Sessions/             # Connection abstraction: ISessionChannel / SshChannel / SerialChannel / ShellChannel
 │   ├── Connections/          # Connection data: Connection / ConnectionStore(SQLite) / CredentialVault
 │   ├── Scripting/            # TTL engine: TTLInterpreter / ScriptRunner / GroupSyncContext / Pdu
-│   └── Infrastructure/       # AppLogger / AppSettings / NativeTheme
-└── src/ETTerms.SerialMcp/    # 🔜 Serial MCP server (stdio) — lets AI agents drive the serial port
+│   └── Infrastructure/       # AppLogger / AppSettings / McpRegistrar / NativeTheme
+└── src/ETTerms.SerialMcp/    # Serial MCP server (stdio) — lets AI agents drive the serial port
 ```
 
 **Core design:** every connection implements `ISessionChannel` (`Write(byte[])` + `event DataReceived`). `TerminalView` and `TTLInterpreter` only know this abstraction, so SSH / Serial / Shell look identical to upper layers — the key to "one script engine driving multiple connection types." See [ARCHITECTURE.md](ARCHITECTURE.md).
@@ -397,18 +402,25 @@ ETTerms/
 
 ## 📜 Version History
 
-### v0.1.0 (in development)
+### v0.2.1
+
+- **AI MCP one-click setup** — new **Settings → AI MCP** tab registers the Serial MCP server into Claude Code (`~/.claude.json`) or Kiro (`~/.kiro/settings/mcp.json`) with a single button; existing MCP servers are preserved, and each card shows the verify command
+- Publish now auto-bundles `ETTerms.SerialMcp` into the app folder, so the registered path always resolves
+
+### v0.2.0
+
+- **Phase 9: Serial MCP server** (`ETTerms.SerialMcp`) — AI agents (Kiro CLI / Claude CLI) send/receive on the serial port while you watch it live in the GUI
+- GUI is the sole COM-port owner; the MCP server bridges over a local named pipe (`SerialBridgeServer`) and never opens the port itself
+- Tools: `serial_list` / `serial_attach` / `serial_write` / `serial_read` / `serial_detach`; AI's TX echoed into the terminal tagged `[AI]`
+- New app icon (window / taskbar / executable); version shown in the title bar
+
+### v0.1.0
 
 - Phases 1–8 complete: window shell, connection sidebar, tiling workspace, Serial / SSH / local Shell (ConPTY) / SFTP
 - Owner-drawn VT100 terminal rendering
 - TTL scripting engine (ported from MyTeraTerm) + Group sync execution
 - PDU power control (SNMP)
 - Settings / About
-- Packaging TBD
-
-**Planned**
-
-- Phase 9: Serial MCP server (`ETTerms.SerialMcp`) — let AI agents (Kiro CLI / Claude CLI) drive the serial port directly
 
 ---
 

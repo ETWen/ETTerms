@@ -4,7 +4,7 @@
 
 > 原生 Windows 終端機工作台（C# .NET 8 WinForms）—— 一個視窗整合 **SSH**、**Serial Port**、**本機 Shell (ConPTY)** 連線，內建從 MyTeraTerm 移植的 **TTL 腳本引擎**做自動化，並提供選用的 **Serial MCP server**，讓 AI agent（Kiro CLI / Claude CLI）直接操作 serial port。單機、無雲、無登入系統。
 
-![version](https://img.shields.io/badge/version-0.1.0-blue.svg) ![platform](https://img.shields.io/badge/platform-Windows-0078D6.svg?logo=windows&logoColor=white) ![.NET](https://img.shields.io/badge/.NET-8.0-512BD4.svg?logo=dotnet&logoColor=white) ![UI](https://img.shields.io/badge/UI-WinForms-5C2D91.svg) ![SSH](https://img.shields.io/badge/SSH-SSH.NET-success.svg) ![Serial](https://img.shields.io/badge/Serial-System.IO.Ports-success.svg) ![status](https://img.shields.io/badge/status-WIP-orange.svg) ![license](https://img.shields.io/badge/license-MIT-green.svg)
+![version](https://img.shields.io/badge/version-0.2.1-blue.svg) ![platform](https://img.shields.io/badge/platform-Windows-0078D6.svg?logo=windows&logoColor=white) ![.NET](https://img.shields.io/badge/.NET-8.0-512BD4.svg?logo=dotnet&logoColor=white) ![UI](https://img.shields.io/badge/UI-WinForms-5C2D91.svg) ![SSH](https://img.shields.io/badge/SSH-SSH.NET-success.svg) ![Serial](https://img.shields.io/badge/Serial-System.IO.Ports-success.svg) ![status](https://img.shields.io/badge/status-beta-yellow.svg) ![license](https://img.shields.io/badge/license-MIT-green.svg)
 
 ---
 
@@ -65,10 +65,11 @@
   - 透過 SNMP（`SnmpSharpNet`）控制 PDU 插座，測試中遠端電源循環
   - 腳本指令：`pduconnect` / `pductrl`
 
-- 🤖 **AI / MCP 整合（選用，規劃中）**
+- 🤖 **AI / MCP 整合（選用）**
   - **COM port 由 GUI 持有**；獨立的 stdio **Serial MCP server** 經本機 named pipe 橋接過去，供 **Kiro CLI / Claude CLI** 使用
   - 工具：`serial_list` / `serial_attach` / `serial_write` / `serial_read` / `serial_detach`
   - AI 的 serial 收發會即時顯示在 GUI（標 `[AI]`）——先在 GUI 開好 port，再讓 AI attach
+  - **一鍵設定**：在 **設定 → AI MCP** 一個按鈕就把 server 註冊進 Claude Code / Kiro
 
 - 📊 **連線 RX 日誌**
   - `logopen` / `logwrite` / `logclose` 將工作階段輸出寫檔
@@ -271,7 +272,7 @@ wait 'login: '
 
 ## 🤖 AI / MCP 整合
 
-> 🔜 **規劃中（Phase 9）。** 讓 AI agent（**Kiro CLI / Claude CLI**）收發 serial，**而且你能在 ETTerms GUI 即時看到 AI 的每筆收發**。
+> 讓 AI agent（**Kiro CLI / Claude CLI**）收發 serial，**而且你能在 ETTerms GUI 即時看到 AI 的每筆收發**。
 
 **關鍵設計：COM port 由 GUI 唯一持有，MCP server 不自己開 port。** 一個 COM port 同時只能被一個行程開啟；因此不讓 MCP server 自己開，而是 **GUI 當 port 的唯一擁有者**，在 GUI 內跑一支本機 **named pipe server**（`SerialBridgeServer`）。獨立的 `ETTerms.SerialMcp`（由 Kiro/Claude CLI 啟動）退化成瘦客戶端：所有 `write` / `read` 都經 pipe 轉發給 GUI，由 GUI 代為讀寫實體 port。AI 的 TX 會以 `[AI]` 標色 echo 進終端機，RX/TX 都流經 GUI channel，**你看到的就是 AI 看到的**。
 
@@ -287,7 +288,11 @@ wait 'login: '
 | `serial_read` | waitFor?, timeoutMs? | 取出累積的 RX；可等待子字串或逾時 |
 | `serial_detach` | — | 解除綁定（**不會**關閉 GUI 的 port） |
 
-在 Kiro CLI 註冊：
+### 一鍵設定（推薦）
+
+在 **設定 → AI MCP**，對 Claude Code 或 Kiro 卡片按 **Setup**，一個按鈕就把 Serial MCP server 寫進該 CLI 的使用者層級設定檔（`~/.claude.json` / `~/.kiro/settings/mcp.json`）。你既有的其他 MCP server 會被保留，卡片並顯示用來驗證連線的 CLI 指令。按 **Remove** 即可移除。
+
+### 手動設定
 
 ```powershell
 kiro-cli mcp add --name serial --command dotnet --args "run --project src\ETTerms.SerialMcp\ETTerms.SerialMcp.csproj"
@@ -377,8 +382,8 @@ ETTerms/
 │   ├── Sessions/             # 連線抽象：ISessionChannel / SshChannel / SerialChannel / ShellChannel
 │   ├── Connections/          # 連線資料：Connection / ConnectionStore(SQLite) / CredentialVault
 │   ├── Scripting/            # TTL 引擎：TTLInterpreter / ScriptRunner / GroupSyncContext / Pdu
-│   └── Infrastructure/       # AppLogger / AppSettings / NativeTheme
-└── src/ETTerms.SerialMcp/    # 🔜 Serial MCP server（stdio）—— 讓 AI agent 直接操作 serial port
+│   └── Infrastructure/       # AppLogger / AppSettings / McpRegistrar / NativeTheme
+└── src/ETTerms.SerialMcp/    # Serial MCP server（stdio）—— 讓 AI agent 直接操作 serial port
 ```
 
 **核心設計：** 所有連線都實作 `ISessionChannel`（`Write(byte[])` + `event DataReceived`）。`TerminalView` 與 `TTLInterpreter` 只認得這個抽象，因此 SSH / Serial / Shell 對上層完全一致——這是「同一套腳本引擎驅動多種連線」的關鍵。詳見 [ARCHITECTURE.md](ARCHITECTURE.md)。
@@ -397,18 +402,25 @@ ETTerms/
 
 ## 📜 版本紀錄
 
-### v0.1.0（開發中）
+### v0.2.1
+
+- **AI MCP 一鍵設定** —— 新增 **設定 → AI MCP** 分頁，一個按鈕就把 Serial MCP server 註冊進 Claude Code（`~/.claude.json`）或 Kiro（`~/.kiro/settings/mcp.json`）；保留檔內其他既有 MCP server，卡片並顯示驗證指令
+- Publish 會自動把 `ETTerms.SerialMcp` 一併打包進 app 資料夾，註冊寫入的路徑必定存在
+
+### v0.2.0
+
+- **Phase 9：Serial MCP server**（`ETTerms.SerialMcp`）—— AI agent（Kiro CLI / Claude CLI）可在 serial port 收發，而你在 GUI 即時看著
+- COM port 由 GUI 唯一持有；MCP server 經本機 named pipe（`SerialBridgeServer`）橋接，自己不開 port
+- 工具：`serial_list` / `serial_attach` / `serial_write` / `serial_read` / `serial_detach`；AI 的 TX 在終端機以 `[AI]` 標色 echo
+- 新增 app 圖示（視窗 / 工作列 / 執行檔）；標題列顯示版本號
+
+### v0.1.0
 
 - Phase 1–8 完成：視窗外殼、連線側欄、平鋪工作區、Serial / SSH / 本機 Shell (ConPTY) / SFTP
 - 自繪 VT100 終端機渲染
 - TTL 腳本引擎（移植自 MyTeraTerm）+ Group 同步執行
 - PDU 電源控制（SNMP）
 - Settings / About
-- 打包待規劃
-
-**規劃中**
-
-- Phase 9：Serial MCP server（`ETTerms.SerialMcp`）—— 讓 AI agent（Kiro CLI / Claude CLI）直接操作 serial port
 
 ---
 

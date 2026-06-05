@@ -160,6 +160,7 @@ ETTerms/
         └── Infrastructure/
             ├── AppLogger.cs        #   日誌 (port 自 MyTeraTerm)
             ├── AppSettings.cs      #   使用者偏好 (JSON, %LocalAppData%\ETTerms\settings.json)
+            ├── McpRegistrar.cs     # ✅ 一鍵把 Serial MCP 註冊/移除到 Claude Code / Kiro 設定檔（Settings → AI MCP）
             └── NativeTheme.cs      #   深色標題列 (DWM)
     │
     └── ETTerms.SerialMcp/          # ✅ Serial MCP server（stdio）——不自己開 port，經 named pipe 橋接 GUI
@@ -411,7 +412,11 @@ ETTerms GUI（單一行程，唯一開 COM3 的人）
 - **可視性：** AI 的 TX 在 GUI 以 `[AI]` 標色，與使用者手打的輸入區分；RX 兩邊同源。
 - **安全：** 本機、無雲、不碰 credential；pipe 僅限本機行程，只搬 serial bytes。
 
-### 註冊（Kiro CLI）
+### 註冊（兩種方式）
+
+**方式 A — 一鍵設定（推薦，v0.2.1）：** GUI **Settings → AI MCP** 分頁，對 Claude Code / Kiro 各按 **Setup** 即可。`McpRegistrar` 以 read-modify-write 把 `etterms-serial` 寫進該 CLI 的使用者層級設定檔（Claude Code：`~/.claude.json`；Kiro：`~/.kiro/settings/mcp.json`），保留檔內其他既有 MCP server，原子寫回避免壞檔。註冊的執行檔路徑指向 `<ETTerms.exe>\ETTerms.SerialMcp\ETTerms.SerialMcp.exe`（與 publish 慣例對齊，必定存在）；卡片同時顯示 CLI 驗證指令，按 **Remove** 可移除。
+
+**方式 B — 手動 CLI：**
 
 ```powershell
 kiro-cli mcp add --name serial --command dotnet `
@@ -508,7 +513,8 @@ ETTerms_v0.2.0\
 ```
 
 **規則：**
-1. **GUI 與 MCP 都發佈**：主程式發到 `ETTerms_v{Version}\`，`ETTerms.SerialMcp` 發到其下 **`ETTerms.SerialMcp\` 子資料夾**（兩者相依 dll 不互相覆蓋）。
+1. **GUI publish 會自動帶上 MCP**：`ETTerms.csproj` 有 `PublishSerialMcp` target（`AfterTargets="Publish"`），會把 `ETTerms.SerialMcp` 一併發佈到 `ETTerms_v{Version}\ETTerms.SerialMcp\` **子資料夾**（與 GUI 相依 dll 隔離）。因此**只要發佈 GUI 一個指令**即可，不必再單獨發 MCP。
+   - 對齊 `McpRegistrar.ResolveServerExe()`：它解析的 `<ETTerms.exe>\ETTerms.SerialMcp\ETTerms.SerialMcp.exe` 因此**必定存在**，AI MCP 一鍵設定寫進去的路徑才不會落空。
 2. **主 exe 改名**：`dotnet publish` 產生的 `ETTerms.exe` 重新命名為 **`ETTerms v{Version}.exe`**。
    - 可安全改名：.NET apphost 內部記錄要載入的 `ETTerms.dll`，**不靠自身檔名**，改名後仍正常啟動。
 3. **框架相依**：`--self-contained false -r win-x64`（目標機需已裝 .NET 8 Desktop Runtime）。
@@ -519,13 +525,9 @@ $ver    = ([regex]::Match((Get-Content src\ETTerms\ETTerms.csproj -Raw), '<Versi
 $root   = "src\ETTerms\Publish\ETTerms_v$ver"
 if (Test-Path $root) { Remove-Item $root -Recurse -Force }
 
-# 1) GUI
-dotnet publish src\ETTerms\ETTerms.csproj         -c Release -r win-x64 --self-contained false -o $root
+# 發佈 GUI；ETTerms.SerialMcp 由 PublishSerialMcp target 自動發到 $root\ETTerms.SerialMcp\
+dotnet publish src\ETTerms\ETTerms.csproj -c Release -r win-x64 --self-contained false -o $root
 Rename-Item (Join-Path $root "ETTerms.exe") "ETTerms v$ver.exe"
-
-# 2) Serial MCP server → 子資料夾
-dotnet publish src\ETTerms.SerialMcp\ETTerms.SerialMcp.csproj -c Release -r win-x64 --self-contained false `
-    -o (Join-Path $root "ETTerms.SerialMcp")
 ```
 
 ---

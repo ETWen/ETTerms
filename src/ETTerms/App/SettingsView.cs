@@ -5,7 +5,7 @@ using ETTerms.Scripting.Pdu;
 
 namespace ETTerms.App;
 
-/// <summary>Settings page with tabs: Terminal / PDU.</summary>
+/// <summary>Settings page with tabs: Terminal / PDU / AI MCP.</summary>
 public sealed class SettingsView : UserControl
 {
     public SettingsView()
@@ -20,19 +20,17 @@ public sealed class SettingsView : UserControl
             Padding = new Padding(4, 4, 4, 0), WrapContents = false
         };
 
-        var terminalPage = BuildTerminalTab();
-        var pduPage = BuildPduTab();
-        terminalPage.Dock = DockStyle.Fill;
-        pduPage.Dock = DockStyle.Fill;
-        pduPage.Visible = false;
-
         var body = new Panel { Dock = DockStyle.Fill, BackColor = Theme.WorkspaceBack };
-        body.Controls.Add(terminalPage);
-        body.Controls.Add(pduPage);
+        var pages = new List<Panel>();
 
         Button? activeBtn = null;
         Button MakeTab(string text, Panel page)
         {
+            page.Dock = DockStyle.Fill;
+            page.Visible = false;
+            body.Controls.Add(page);
+            pages.Add(page);
+
             var b = new Button
             {
                 Text = text, AutoSize = false, Width = 80, Height = 26, FlatStyle = FlatStyle.Flat,
@@ -43,8 +41,7 @@ public sealed class SettingsView : UserControl
             b.FlatAppearance.MouseOverBackColor = Theme.Hover;
             b.Click += (_, _) =>
             {
-                terminalPage.Visible = page == terminalPage;
-                pduPage.Visible = page == pduPage;
+                foreach (var p in pages) p.Visible = p == page;
                 if (activeBtn != null) activeBtn.BackColor = Theme.TabBack;
                 b.BackColor = Theme.TabActiveBack;
                 activeBtn = b;
@@ -52,17 +49,16 @@ public sealed class SettingsView : UserControl
             return b;
         }
 
-        var termBtn = MakeTab("Terminal", terminalPage);
-        var pduBtn = MakeTab("PDU", pduPage);
+        var termBtn = MakeTab("Terminal", BuildTerminalTab());
         tabBar.Controls.Add(termBtn);
-        tabBar.Controls.Add(pduBtn);
-
-        // Set initial active
-        termBtn.BackColor = Theme.TabActiveBack;
-        activeBtn = termBtn;
+        tabBar.Controls.Add(MakeTab("PDU", BuildPduTab()));
+        tabBar.Controls.Add(MakeTab("AI MCP", BuildAiMcpTab()));
 
         Controls.Add(body);
         Controls.Add(tabBar);
+
+        // Set initial active tab
+        termBtn.PerformClick();
     }
 
     // ═══ Terminal Tab ═══
@@ -273,6 +269,166 @@ public sealed class SettingsView : UserControl
             row.Cells["Power"].Value = power.HasValue ? $"{power.Value:F1}" : "—";
             row.DefaultCellStyle.BackColor = state == true ? Color.FromArgb(40, 80, 40) : state == false ? Color.FromArgb(60, 40, 40) : Theme.TabBack;
         }
+    }
+
+    // ═══ AI MCP Tab ═══
+    private Panel BuildAiMcpTab()
+    {
+        var page = new Panel { BackColor = Theme.WorkspaceBack, Padding = new Padding(20) };
+
+        var flow = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown,
+            WrapContents = false, BackColor = Theme.WorkspaceBack, AutoScroll = true
+        };
+
+        flow.Controls.Add(new Label
+        {
+            Text = "AI MCP Integration", AutoSize = true,
+            ForeColor = Theme.Accent, Font = Theme.UiFontBold, Margin = new Padding(0, 0, 0, 4)
+        });
+        flow.Controls.Add(new Label
+        {
+            Text = "One-click register the ETTerms Serial MCP server into your AI CLI's user-level\n" +
+                   "config. ETTerms keeps sole ownership of the COM port; the AI drives serial through\n" +
+                   "a local named pipe. Open a Serial session in ETTerms first, then the AI can attach.",
+            AutoSize = false, Width = 600, Height = 56,
+            ForeColor = Theme.TextDim, Font = Theme.UiFont, Margin = new Padding(0, 0, 0, 8)
+        });
+
+        // Resolved MCP server exe
+        var exe = McpRegistrar.ResolveServerExe();
+        var exists = McpRegistrar.ServerExeExists();
+        flow.Controls.Add(new Label
+        {
+            Text = $"MCP server:  {exe}",
+            AutoSize = false, Width = 600, Height = 20,
+            ForeColor = exists ? Theme.SerialColor : Color.FromArgb(210, 150, 120),
+            Font = Theme.UiFont, Margin = new Padding(0, 0, 0, 2)
+        });
+        if (!exists)
+        {
+            flow.Controls.Add(new Label
+            {
+                Text = "⚠ Not found yet — publish the app (or build ETTerms.SerialMcp). Setup still writes this expected path.",
+                AutoSize = false, Width = 600, Height = 20,
+                ForeColor = Color.FromArgb(210, 150, 120), Font = Theme.UiFont, Margin = new Padding(0, 0, 0, 4)
+            });
+        }
+
+        flow.Controls.Add(MakeSpacer(10));
+        flow.Controls.Add(BuildMcpTargetCard(McpTarget.Claude));
+        flow.Controls.Add(MakeSpacer(10));
+        flow.Controls.Add(BuildMcpTargetCard(McpTarget.Kiro));
+
+        page.Controls.Add(flow);
+        return page;
+    }
+
+    /// <summary>單一 AI 目標（Claude / Kiro）的設定卡：狀態 + Setup / Remove + CLI 驗證指令。</summary>
+    private Panel BuildMcpTargetCard(McpTarget target)
+    {
+        var card = new Panel
+        {
+            Width = 600, Height = 196, BackColor = Theme.TabBack,
+            Padding = new Padding(14), Margin = new Padding(0, 0, 0, 4)
+        };
+        var col = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown,
+            WrapContents = false, BackColor = Theme.TabBack, AutoSize = false
+        };
+
+        var title = new Label
+        {
+            Text = McpRegistrar.DisplayName(target), AutoSize = true,
+            ForeColor = Theme.Text, Font = Theme.UiFontBold, Margin = new Padding(0, 0, 0, 2)
+        };
+        var status = new Label { AutoSize = true, Font = Theme.UiFont, Margin = new Padding(0, 0, 0, 2) };
+        var pathLbl = new Label
+        {
+            Text = $"Config:  {McpRegistrar.ConfigPath(target)}",
+            AutoSize = false, Width = 560, Height = 18,
+            ForeColor = Theme.TextDim, Font = Theme.UiFont, Margin = new Padding(0, 0, 0, 6)
+        };
+
+        var setupBtn = MakeButton("Setup", Theme.Accent);
+        var removeBtn = MakeButton("Remove", Color.FromArgb(210, 120, 120));
+        setupBtn.Margin = new Padding(0, 0, 8, 0);
+        var btnRow = new FlowLayoutPanel
+        {
+            FlowDirection = FlowDirection.LeftToRight, AutoSize = true,
+            WrapContents = false, BackColor = Theme.TabBack, Margin = new Padding(0, 0, 0, 8)
+        };
+        btnRow.Controls.Add(setupBtn);
+        btnRow.Controls.Add(removeBtn);
+
+        var verifyLbl = new Label
+        {
+            Text = "Verify in your CLI:", AutoSize = true,
+            ForeColor = Theme.TextDim, Font = Theme.UiFont, Margin = new Padding(0, 0, 0, 2)
+        };
+        var verifyBox = new TextBox
+        {
+            Multiline = true, ReadOnly = true, Width = 560, Height = 56,
+            BackColor = Color.FromArgb(20, 20, 24), ForeColor = Color.FromArgb(200, 200, 200),
+            BorderStyle = BorderStyle.FixedSingle, Font = new Font("Cascadia Mono", 9f),
+            Text = McpRegistrar.VerifyHint(target)
+        };
+
+        void Refresh()
+        {
+            bool reg = McpRegistrar.IsRegistered(target);
+            status.Text = reg ? "● Configured" : "○ Not configured";
+            status.ForeColor = reg ? Theme.SerialColor : Theme.TextDim;
+            removeBtn.Enabled = reg;
+        }
+
+        setupBtn.Click += (_, _) =>
+        {
+            try
+            {
+                McpRegistrar.Register(target);
+                Refresh();
+                MessageBox.Show(this,
+                    $"{McpRegistrar.DisplayName(target)} is now configured.\n\n" +
+                    "Restart your AI CLI (or open a new session), then run the verify command shown below.",
+                    "AI MCP", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, $"Failed to write config:\n{ex.Message}",
+                    "AI MCP", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        };
+
+        removeBtn.Click += (_, _) =>
+        {
+            try
+            {
+                McpRegistrar.Unregister(target);
+                Refresh();
+                MessageBox.Show(this,
+                    $"Removed from {McpRegistrar.DisplayName(target)}.\nRestart your AI CLI for it to take effect.",
+                    "AI MCP", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, $"Failed to update config:\n{ex.Message}",
+                    "AI MCP", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        };
+
+        Refresh();
+
+        col.Controls.Add(title);
+        col.Controls.Add(status);
+        col.Controls.Add(pathLbl);
+        col.Controls.Add(btnRow);
+        col.Controls.Add(verifyLbl);
+        col.Controls.Add(verifyBox);
+        card.Controls.Add(col);
+        return card;
     }
 
     // ── Helpers ──

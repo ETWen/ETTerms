@@ -10,6 +10,8 @@ ETTerms 是一個 **C# .NET 8 WinForms** 的原生 Windows 終端機工作台，
 
 **進度：** Phase 1–5 ✅、Phase 6 ✅（TTL 引擎 + Group 同步，SSH 待驗收）、Phase 7 ✅（Settings/About）、Phase 8 ✅（PDU + Shell/ConPTY + SFTP + Settings 擴充）、Phase 9 ✅（Serial MCP server：**GUI 持有 COM port，MCP 經本機 named pipe 橋接**，AI 收發的資料即時以 `[AI]` 標色顯示在 GUI）。打包待指示。
 
+**v0.2.1：** 新增 GUI **Settings → AI MCP** 分頁（`McpRegistrar`）：對 Claude Code（`~/.claude.json`）與 Kiro（`~/.kiro/settings/mcp.json`）**一鍵 Setup / Remove** 註冊 `etterms-serial` MCP server，read-modify-write 保留檔內其他設定、原子寫回；卡片附 CLI 驗證指令。`ETTerms.csproj` 加 `PublishSerialMcp` target（`AfterTargets=Publish`），GUI publish 會自動把 `ETTerms.SerialMcp` 帶到 `\ETTerms.SerialMcp\` 子資料夾，與 `McpRegistrar.ResolveServerExe()` 解析路徑對齊。
+
 **v0.2.0：** Phase 9 完成 — `ETTerms.SerialMcp`（stdio MCP server）+ GUI `SerialBridgeServer`（named pipe `\\.\pipe\etterms-serial`）上線，提供 `serial_list` / `serial_attach` / `serial_write` / `serial_read` / `serial_detach` 五個工具，AI 的 TX 在 GUI 以 `[AI]` 標色即時 echo；視窗 / 工作列 / About 改用 Choco 圖示，標題列顯示版本號。見 [docs/serial-mcp-guide.md](docs/serial-mcp-guide.md)。
 
 **v0.1.2：** 新增 `sprintf2`（TeraTerm 相容 C printf 格式化）；`wait` 改為命中關鍵字後須等裝置安靜（`SettleMs` 預設 300ms）才接受並取「最後一次」出現，排除輸出中途的指令回顯（避免腳本搶跑）。
@@ -39,13 +41,16 @@ dotnet run --project src\ETTerms\ETTerms.csproj
 dotnet add src\ETTerms package SSH.NET
 
 # 打包（見「Publish / 打包慣例」，輸出固定到 src\ETTerms\Publish\ETTerms_v{Version}\）
+# GUI publish 會「自動」把 ETTerms.SerialMcp 一併發到 \ETTerms.SerialMcp\ 子資料夾
+# （ETTerms.csproj 的 PublishSerialMcp target，AfterTargets=Publish），不必再單獨發 MCP。
 $ver = ([regex]::Match((Get-Content src\ETTerms\ETTerms.csproj -Raw), '<Version>([^<]+)</Version>')).Groups[1].Value
 $root = "src\ETTerms\Publish\ETTerms_v$ver"
 dotnet publish src\ETTerms\ETTerms.csproj -c Release -r win-x64 --self-contained false -o $root
 Rename-Item (Join-Path $root "ETTerms.exe") "ETTerms v$ver.exe"
-dotnet publish src\ETTerms.SerialMcp\ETTerms.SerialMcp.csproj -c Release -r win-x64 --self-contained false -o (Join-Path $root "ETTerms.SerialMcp")
 
 # 註冊 Serial MCP server（給 AI agent 操作 serial）
+# 推薦：GUI Settings → AI MCP 分頁，對 Claude Code / Kiro 按 Setup 一鍵註冊（McpRegistrar）。
+# 或手動 CLI：
 kiro-cli mcp add --name serial --command dotnet --args "run --project src\ETTerms.SerialMcp\ETTerms.SerialMcp.csproj"
 ```
 

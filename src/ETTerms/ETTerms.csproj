@@ -10,7 +10,7 @@
     <AssemblyName>ETTerms</AssemblyName>
 
     <!-- 版本資訊 -->
-    <Version>0.2.0</Version>
+    <Version>0.2.1</Version>
     <Product>ETTerms</Product>
     <Company>ETTerms Project</Company>
 
@@ -31,5 +31,20 @@
     <PackageReference Include="SSH.NET" Version="2024.2.0" />
     <PackageReference Include="System.IO.Ports" Version="8.0.0" />
   </ItemGroup>
+
+  <!--
+    發佈 GUI 時，自動把 Serial MCP server 一併發佈到 <publish>\ETTerms.SerialMcp\ 子資料夾。
+    這樣單一 `dotnet publish src\ETTerms` 就會產生完整自洽的 bundle，
+    且 McpRegistrar.ResolveServerExe() 解析的 <ETTerms.exe>\ETTerms.SerialMcp\ETTerms.SerialMcp.exe 必定存在。
+    刻意放子資料夾：與 GUI 的相依 dll 隔離，避免互相覆蓋。
+  -->
+  <Target Name="PublishSerialMcp" AfterTargets="Publish">
+    <PropertyGroup>
+      <_McpRid Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</_McpRid>
+      <_McpRid Condition="'$(RuntimeIdentifier)' == ''">win-x64</_McpRid>
+    </PropertyGroup>
+    <Message Importance="high" Text="[ETTerms] Publishing ETTerms.SerialMcp -> $(PublishDir)ETTerms.SerialMcp" />
+    <Exec Command="dotnet publish &quot;$(MSBuildThisFileDirectory)..\ETTerms.SerialMcp\ETTerms.SerialMcp.csproj&quot; -c $(Configuration) -r $(_McpRid) --self-contained false -o &quot;$(PublishDir)ETTerms.SerialMcp&quot;" />
+  </Target>
 
 </Project>
