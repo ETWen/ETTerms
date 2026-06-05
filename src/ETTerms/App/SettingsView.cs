@@ -33,7 +33,9 @@ public sealed class SettingsView : UserControl
 
             var b = new Button
             {
-                Text = text, AutoSize = false, Width = 80, Height = 26, FlatStyle = FlatStyle.Flat,
+                Text = text, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                MinimumSize = new Size(70, 26), Padding = new Padding(10, 2, 10, 2),
+                FlatStyle = FlatStyle.Flat,
                 ForeColor = Theme.Text, BackColor = Theme.TabBack, Font = Theme.UiFont,
                 Margin = new Padding(0, 0, 4, 0), Cursor = Cursors.Hand
             };
@@ -432,25 +434,27 @@ public sealed class SettingsView : UserControl
     }
 
     // ── Helpers ──
-    private const int LabelWidth = 150;   // 標籤欄固定寬度
+    private const int LabelWidth = 150;   // 標籤欄最小寬度
     private const int InputWidth = 200;   // 所有輸入框統一寬度
 
-    private static Panel MakeRow(string label, Control control)
+    private static Control MakeRow(string label, Control control)
     {
-        var row = new Panel { Width = LabelWidth + InputWidth, Height = 32, Margin = new Padding(0, 3, 0, 3) };
-
-        // 統一輸入框寬度 + 左緣對齊（不再 Dock.Right，避免右對齊造成左緣參差）
-        control.Width = InputWidth;
-        int top = (row.Height - control.Height) / 2;
-        control.Location = new Point(LabelWidth, top < 0 ? 0 : top);
-
-        row.Controls.Add(control);
-        row.Controls.Add(new Label
+        // 用 FlowLayout + AutoSize 標籤取代絕對定位，讓高 DPI 下標籤變寬也不會被裁、且對齊穩定
+        var row = new FlowLayoutPanel
         {
-            Text = label, AutoSize = false, Width = LabelWidth, Height = row.Height,
-            Location = new Point(0, 0), ForeColor = Theme.Text, Font = Theme.UiFont,
-            TextAlign = ContentAlignment.MiddleLeft
-        });
+            AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            FlowDirection = FlowDirection.LeftToRight, WrapContents = false,
+            Margin = new Padding(0, 3, 0, 3), BackColor = Color.Transparent
+        };
+        var lbl = new Label
+        {
+            Text = label, AutoSize = true, MinimumSize = new Size(LabelWidth, 0),
+            ForeColor = Theme.Text, Font = Theme.UiFont,
+            TextAlign = ContentAlignment.MiddleLeft, Margin = new Padding(0, 6, 8, 0)
+        };
+        if (control.Width <= 0) control.Width = InputWidth;
+        row.Controls.Add(lbl);
+        row.Controls.Add(control);
         return row;
     }
 
@@ -458,7 +462,9 @@ public sealed class SettingsView : UserControl
     {
         var b = new Button
         {
-            Text = text, Width = 90, Height = 28, FlatStyle = FlatStyle.Flat,
+            Text = text, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            MinimumSize = new Size(90, 28), Padding = new Padding(10, 2, 10, 2),
+            FlatStyle = FlatStyle.Flat,
             ForeColor = Theme.Text, BackColor = Theme.TabBack, Font = Theme.UiFont,
             Cursor = Cursors.Hand, Margin = new Padding(8, 0, 0, 0)
         };

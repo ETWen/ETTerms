@@ -17,7 +17,9 @@ public sealed class ActivityRail : UserControl
     private RailView _active = RailView.Terminal;
     private RailView? _hover;
 
-    private const int ItemSize = 56;
+    private const int BaseItemSize = 56;
+    /// <summary>依目前螢幕 DPI 縮放的格子大小（owner-draw 不會自動縮放像素，需自己換算）。</summary>
+    private int ItemSize => (int)Math.Round(BaseItemSize * (DeviceDpi / 96.0));
     private static readonly (RailView view, string glyph, string tip)[] Items =
     {
         (RailView.Terminal, "▤", "Terminal"),
@@ -35,6 +37,19 @@ public sealed class ActivityRail : UserControl
         DoubleBuffered = true;
         SetStyle(ControlStyles.ResizeRedraw, true);
         Cursor = Cursors.Hand;
+    }
+
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+        Width = ItemSize;   // handle 建立後 DeviceDpi 才正確，依實際 DPI 重設寬度
+    }
+
+    protected override void OnDpiChangedAfterParent(EventArgs e)
+    {
+        base.OnDpiChangedAfterParent(e);
+        Width = ItemSize;   // 拖到不同縮放的螢幕時跟著調整
+        Invalidate();
     }
 
     [System.ComponentModel.DesignerSerializationVisibility(
