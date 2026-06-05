@@ -432,7 +432,7 @@ ETTerms/
 
 ## 🙏 致謝
 
-- **[KKTerm](https://github.com/)** — UI 設計參考（Activity Rail + 分頁工作區 + Saved Connections）
+- **[KKTerm](https://github.com/ryantsai/KKTerm)** — by ryantsai（MIT）UI 設計參考（Activity Rail + 分頁工作區 + Saved Connections）
 - **MyTeraTerm** — TTL 腳本引擎與 `AppLogger` 來源
 - **[SSH.NET](https://github.com/sshnet/SSH.NET)**、**[SnmpSharpNet](http://www.snmpsharpnet.com/)** — 開源連線 / SNMP 函式庫
 - **Microsoft** — .NET 8、WinForms、ConPTY、Credential Manager

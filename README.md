@@ -432,7 +432,7 @@ Licensed under the **MIT License** — see [LICENSE](LICENSE).
 
 ## 🙏 Acknowledgments
 
-- **[KKTerm](https://github.com/)** — UI design reference (Activity Rail + tabbed workspace + Saved Connections)
+- **[KKTerm](https://github.com/ryantsai/KKTerm)** — by ryantsai (MIT) — UI design reference (Activity Rail + tabbed workspace + Saved Connections)
 - **MyTeraTerm** — source of the TTL scripting engine and `AppLogger`
 - **[SSH.NET](https://github.com/sshnet/SSH.NET)**, **[SnmpSharpNet](http://www.snmpsharpnet.com/)** — open-source connectivity / SNMP libraries
 - **Microsoft** — .NET 8, WinForms, ConPTY, Credential Manager
