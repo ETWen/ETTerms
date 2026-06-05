@@ -270,20 +270,29 @@ public sealed class ScreenBuffer
     {
         cols = Math.Max(1, cols); rows = Math.Max(1, rows);
         if (cols == Cols && rows == Rows) return;
-        var ng = new Cell[rows][];
-        for (int r = 0; r < rows; r++)
-        {
-            ng[r] = new Cell[cols];
-            for (int c = 0; c < cols; c++)
-                ng[r][c] = (r < Rows && c < Cols) ? _screen[r][c] : BlankDefault();
-        }
-        _screen = ng;
+        _screen = Reflow(_screen, rows, cols);
+        // alt screen 啟用中也要一併 reflow 保存的主畫面，否則 resize 後 ExitAlt 會還原失敗、
+        // 畫面殘留 TUI 內容。不可把 _mainScreen 丟掉。
+        if (_mainScreen != null) _mainScreen = Reflow(_mainScreen, rows, cols);
         Rows = rows; Cols = cols;
         _top = 0; _bottom = Rows - 1;
         CursorRow = Math.Clamp(CursorRow, 0, Rows - 1);
         CursorCol = Math.Clamp(CursorCol, 0, Cols - 1);
         _wrapPending = false;
-        _mainScreen = null;
-        if (AltActive) { /* alt 下 resize：重建 alt 畫面 */ }
+    }
+
+    /// <summary>把字格陣列重排到新尺寸，保留左上重疊區，其餘填預設空白。</summary>
+    private Cell[][] Reflow(Cell[][] src, int rows, int cols)
+    {
+        int oldRows = src.Length;
+        var ng = new Cell[rows][];
+        for (int r = 0; r < rows; r++)
+        {
+            ng[r] = new Cell[cols];
+            int oldCols = r < oldRows ? src[r].Length : 0;
+            for (int c = 0; c < cols; c++)
+                ng[r][c] = (c < oldCols) ? src[r][c] : BlankDefault();
+        }
+        return ng;
     }
 }

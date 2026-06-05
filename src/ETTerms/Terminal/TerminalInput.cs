@@ -9,6 +9,11 @@ public static class TerminalInput
 {
     public static byte[]? Map(KeyEventArgs e, bool appCursor)
     {
+        // Enter：一般送 CR(\r) 視為「送出」；Shift+Enter 送 LF(\n)，讓 PSReadLine / Kiro 等
+        // 視為「插入換行」以便輸入多行指令，而不是直接送出。
+        if (e.KeyCode == Keys.Enter)
+            return new[] { (byte)(e.Shift ? '\n' : '\r') };
+
         string? seq = e.KeyCode switch
         {
             Keys.Up => appCursor ? "\x1bOA" : "\x1b[A",
@@ -21,7 +26,6 @@ public static class TerminalInput
             Keys.Delete => "\x1b[3~",
             Keys.PageUp => "\x1b[5~",
             Keys.PageDown => "\x1b[6~",
-            Keys.Enter => "\r",
             Keys.Tab => "\t",
             Keys.Escape => "\x1b",
             Keys.Back => "\x7f",

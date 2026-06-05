@@ -59,6 +59,13 @@ public sealed class TerminalView : UserControl
     protected override void OnSizeChanged(EventArgs e)
     {
         base.OnSizeChanged(e);
+
+        // 視窗最小化、或分頁/分割切換的瞬間，ClientSize 會變成 0/極小。此時若把退化尺寸
+        // （會被算成 1×1）送給 PTY，ConPTY 下的全螢幕 TUI（如 Kiro CLI）會誤以為終端機只剩
+        // 1×1 而停止重繪、輸入也像「卡住」。直接忽略這種尺寸，還原後再以正常尺寸重繪即可。
+        if (ClientSize.Width < _cellW || ClientSize.Height < _cellH) return;
+        if (FindForm() is { WindowState: FormWindowState.Minimized }) return;
+
         int cols = VisibleCols, rows = VisibleRows;
         if (cols == _lastCols && rows == _lastRows) return;
         _lastCols = cols; _lastRows = rows;
