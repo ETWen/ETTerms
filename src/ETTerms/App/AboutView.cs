@@ -177,6 +177,11 @@ public sealed class AboutView : UserControl
 
     private static readonly ChangelogEntry[] Changelog =
     [
+        new("0.2.2", new DateOnly(2026, 6, 5), "Bugfix — terminal stability",
+        [
+            "Fixed: the terminal no longer freezes after minimizing or switching tabs (notably in PowerShell / Kiro).",
+            "Added: Shift+Enter inserts a newline in the shell, so you can type multi-line commands.",
+        ]),
         new("0.2.1", new DateOnly(2026, 6, 4), "AI MCP one-click setup",
         [
             "New Settings → AI MCP tab: register the Serial MCP server into Claude Code or Kiro with one click.",
