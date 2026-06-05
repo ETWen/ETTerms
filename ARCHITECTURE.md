@@ -513,22 +513,39 @@ ETTerms_v0.2.0\
 ```
 
 **規則：**
-1. **GUI publish 會自動帶上 MCP**：`ETTerms.csproj` 有 `PublishSerialMcp` target（`AfterTargets="Publish"`），會把 `ETTerms.SerialMcp` 一併發佈到 `ETTerms_v{Version}\ETTerms.SerialMcp\` **子資料夾**（與 GUI 相依 dll 隔離）。因此**只要發佈 GUI 一個指令**即可，不必再單獨發 MCP。
+1. **GUI publish 會自動帶上 MCP**：`ETTerms.csproj` 有 `PublishSerialMcp` target（`AfterTargets="Publish"`），會把 `ETTerms.SerialMcp` 一併發佈到 `<publish>\ETTerms.SerialMcp\` **子資料夾**（與 GUI 相依 dll 隔離）。因此**只要發佈 GUI 一個指令**即可，不必再單獨發 MCP。
    - 對齊 `McpRegistrar.ResolveServerExe()`：它解析的 `<ETTerms.exe>\ETTerms.SerialMcp\ETTerms.SerialMcp.exe` 因此**必定存在**，AI MCP 一鍵設定寫進去的路徑才不會落空。
+   - MCP 子發佈會**跟隨 GUI 的 `SelfContained` 設定**（target 內以 `$(SelfContained)` 傳入）：框架相依版的 MCP 也框架相依；portable 版的 MCP 也免 runtime。
 2. **主 exe 改名**：`dotnet publish` 產生的 `ETTerms.exe` 重新命名為 **`ETTerms v{Version}.exe`**。
    - 可安全改名：.NET apphost 內部記錄要載入的 `ETTerms.dll`，**不靠自身檔名**，改名後仍正常啟動。
-3. **框架相依**：`--self-contained false -r win-x64`（目標機需已裝 .NET 8 Desktop Runtime）。
 
-**PowerShell 範例：**
+### 兩種發佈版本（兩個都要產出）
+
+| 版本 | 資料夾 | 指令旗標 | 需 .NET Runtime？ | 用途 |
+|------|--------|----------|-------------------|------|
+| **A. 框架相依（預設）** | `ETTerms_v{Version}\` | `--self-contained false` | ✅ 需先裝 .NET 8 Desktop Runtime | 體積小；給已具備 runtime 的環境 |
+| **B. Portable（免安裝）** | `ETTerms_v{Version}_portable\` | `--self-contained true` | ❌ 不需要，runtime 已內含 | 體積大（約 240MB）；給受 MIS 管控、不便裝 runtime 的環境，解壓即用、免系統管理員權限 |
+
+> ⚠️ **不要開 trimming**（`PublishTrimmed`）：WinForms 大量用反射，trim 後易在執行時出錯。
+
+**PowerShell 範例（一次產出兩種）：**
 ```powershell
-$ver    = ([regex]::Match((Get-Content src\ETTerms\ETTerms.csproj -Raw), '<Version>([^<]+)</Version>')).Groups[1].Value
-$root   = "src\ETTerms\Publish\ETTerms_v$ver"
-if (Test-Path $root) { Remove-Item $root -Recurse -Force }
+$ver = ([regex]::Match((Get-Content src\ETTerms\ETTerms.csproj -Raw), '<Version>([^<]+)</Version>')).Groups[1].Value
 
-# 發佈 GUI；ETTerms.SerialMcp 由 PublishSerialMcp target 自動發到 $root\ETTerms.SerialMcp\
+# A. 框架相依版 → ETTerms_v{Version}\
+$root = "src\ETTerms\Publish\ETTerms_v$ver"
+if (Test-Path $root) { Remove-Item $root -Recurse -Force }
 dotnet publish src\ETTerms\ETTerms.csproj -c Release -r win-x64 --self-contained false -o $root
 Rename-Item (Join-Path $root "ETTerms.exe") "ETTerms v$ver.exe"
+
+# B. Portable 免安裝版 → ETTerms_v{Version}_portable\（runtime 已內含；MCP 也跟著 self-contained）
+$proot = "src\ETTerms\Publish\ETTerms_v${ver}_portable"
+if (Test-Path $proot) { Remove-Item $proot -Recurse -Force }
+dotnet publish src\ETTerms\ETTerms.csproj -c Release -r win-x64 --self-contained true -o $proot
+Rename-Item (Join-Path $proot "ETTerms.exe") "ETTerms v$ver.exe"
 ```
+
+> 兩版的 `ETTerms.SerialMcp\` 子資料夾都由 `PublishSerialMcp` target 自動產生；portable 版的 MCP 也是 self-contained，故 AI MCP 功能在無 runtime 環境同樣可用。
 
 ---
 

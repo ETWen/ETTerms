@@ -40,13 +40,20 @@ dotnet run --project src\ETTerms\ETTerms.csproj
 # 加套件
 dotnet add src\ETTerms package SSH.NET
 
-# 打包（見「Publish / 打包慣例」，輸出固定到 src\ETTerms\Publish\ETTerms_v{Version}\）
+# 打包（見「Publish / 打包慣例」）—— 兩種版本都產出，輸出到 src\ETTerms\Publish\
 # GUI publish 會「自動」把 ETTerms.SerialMcp 一併發到 \ETTerms.SerialMcp\ 子資料夾
-# （ETTerms.csproj 的 PublishSerialMcp target，AfterTargets=Publish），不必再單獨發 MCP。
+# （ETTerms.csproj 的 PublishSerialMcp target，AfterTargets=Publish），且 MCP 跟隨 GUI 的 self-contained 設定。
 $ver = ([regex]::Match((Get-Content src\ETTerms\ETTerms.csproj -Raw), '<Version>([^<]+)</Version>')).Groups[1].Value
+
+# A. 框架相依版（需目標機已裝 .NET 8 Desktop Runtime）→ ETTerms_v{Version}\
 $root = "src\ETTerms\Publish\ETTerms_v$ver"
 dotnet publish src\ETTerms\ETTerms.csproj -c Release -r win-x64 --self-contained false -o $root
 Rename-Item (Join-Path $root "ETTerms.exe") "ETTerms v$ver.exe"
+
+# B. Portable 免安裝版（runtime 內含，免裝、免管理員）→ ETTerms_v{Version}_portable\
+$proot = "src\ETTerms\Publish\ETTerms_v${ver}_portable"
+dotnet publish src\ETTerms\ETTerms.csproj -c Release -r win-x64 --self-contained true -o $proot
+Rename-Item (Join-Path $proot "ETTerms.exe") "ETTerms v$ver.exe"
 
 # 註冊 Serial MCP server（給 AI agent 操作 serial）
 # 推薦：GUI Settings → AI MCP 分頁，對 Claude Code / Kiro 按 Setup 一鍵註冊（McpRegistrar）。
@@ -57,7 +64,7 @@ kiro-cli mcp add --name serial --command dotnet --args "run --project src\ETTerm
 ## 開發慣例
 
 - **命名：** PascalCase 類別 / 方法，`_camelCase` 私有欄位；檔名 = 類別名。
-- **Publish / 打包：** 固定輸出到 `src\ETTerms\Publish\ETTerms_v{Version}\`（`{Version}` 取自 csproj `<Version>`）；主 exe 改名為 `ETTerms v{Version}.exe`；`ETTerms.SerialMcp` 一併發到其下 `ETTerms.SerialMcp\` 子資料夾。框架相依（`--self-contained false -r win-x64`）。詳見 [ARCHITECTURE.md](ARCHITECTURE.md#publish--打包慣例)。
+- **Publish / 打包：** 輸出到 `src\ETTerms\Publish\`；主 exe 改名為 `ETTerms v{Version}.exe`；`ETTerms.SerialMcp` 一併發到其下 `ETTerms.SerialMcp\` 子資料夾（且跟隨 GUI 的 self-contained 設定）。**兩種版本都產出**：框架相依 `ETTerms_v{Version}\`（`--self-contained false`，需裝 .NET 8 Desktop Runtime）＋ portable 免安裝 `ETTerms_v{Version}_portable\`（`--self-contained true`，runtime 內含）。不要開 trimming（WinForms 反射）。詳見 [ARCHITECTURE.md](ARCHITECTURE.md#publish--打包慣例)。
 - **分層：** UI（`App/`）只認 `ISessionChannel` 抽象，不直接相依 SSH.NET / SerialPort。
 - **執行緒：** channel I/O 在背景；所有 UI 更新一律 `Control.Invoke` 回 UI thread。
 - **commit：** 走 Conventional Commits（`feat:` / `fix:` / `refactor:` …）。

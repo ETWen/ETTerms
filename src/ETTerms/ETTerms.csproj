@@ -37,14 +37,17 @@
     這樣單一 `dotnet publish src\ETTerms` 就會產生完整自洽的 bundle，
     且 McpRegistrar.ResolveServerExe() 解析的 <ETTerms.exe>\ETTerms.SerialMcp\ETTerms.SerialMcp.exe 必定存在。
     刻意放子資料夾：與 GUI 的相依 dll 隔離，避免互相覆蓋。
+    MCP 跟隨 GUI 的 self-contained 設定：框架相依版 → MCP 也框架相依；portable(self-contained)版 → MCP 也免 runtime。
   -->
   <Target Name="PublishSerialMcp" AfterTargets="Publish">
     <PropertyGroup>
       <_McpRid Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</_McpRid>
       <_McpRid Condition="'$(RuntimeIdentifier)' == ''">win-x64</_McpRid>
+      <_McpSelfContained Condition="'$(SelfContained)' != ''">$(SelfContained)</_McpSelfContained>
+      <_McpSelfContained Condition="'$(SelfContained)' == ''">false</_McpSelfContained>
     </PropertyGroup>
-    <Message Importance="high" Text="[ETTerms] Publishing ETTerms.SerialMcp -> $(PublishDir)ETTerms.SerialMcp" />
-    <Exec Command="dotnet publish &quot;$(MSBuildThisFileDirectory)..\ETTerms.SerialMcp\ETTerms.SerialMcp.csproj&quot; -c $(Configuration) -r $(_McpRid) --self-contained false -o &quot;$(PublishDir)ETTerms.SerialMcp&quot;" />
+    <Message Importance="high" Text="[ETTerms] Publishing ETTerms.SerialMcp -> $(PublishDir)ETTerms.SerialMcp (self-contained=$(_McpSelfContained))" />
+    <Exec Command="dotnet publish &quot;$(MSBuildThisFileDirectory)..\ETTerms.SerialMcp\ETTerms.SerialMcp.csproj&quot; -c $(Configuration) -r $(_McpRid) --self-contained $(_McpSelfContained) -o &quot;$(PublishDir)ETTerms.SerialMcp&quot;" />
   </Target>
 
 </Project>
