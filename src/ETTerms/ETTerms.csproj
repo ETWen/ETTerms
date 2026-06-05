@@ -14,6 +14,9 @@
     <Product>ETTerms</Product>
     <Company>ETTerms Project</Company>
 
+    <!-- 高 DPI：PerMonitorV2，讓不同縮放比例的螢幕都能正確縮放、避免文字/按鈕被裁切 -->
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+
     <!-- 視窗 / 工作列 / exe 圖示 -->
     <ApplicationIcon>Assets\Choco_256x256.ico</ApplicationIcon>
   </PropertyGroup>

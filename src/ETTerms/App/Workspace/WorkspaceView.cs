@@ -52,7 +52,8 @@ public sealed class WorkspaceView : UserControl
         BackColor = Theme.WorkspaceBack;
 
         // 頂部工具列容器：左側為 Layout/Run 群組（Fill），右側為 Log All（Dock Right）
-        var topBar = new Panel { Dock = DockStyle.Top, Height = 38, BackColor = Theme.RailBack };
+        // 高度 40 與左側 ConnectionSidebar 的 tab bar 對齊，且容得下 AutoSize 按鈕（不被裁切）
+        var topBar = new Panel { Dock = DockStyle.Top, Height = 40, BackColor = Theme.RailBack };
 
         _toolbar = new FlowLayoutPanel
         {
@@ -374,7 +375,9 @@ public sealed class WorkspaceView : UserControl
     {
         var b = new Button
         {
-            Text = label, AutoSize = false, Size = new Size(44, 26), FlatStyle = FlatStyle.Flat,
+            Text = label, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            MinimumSize = new Size(40, 26), Padding = new Padding(8, 2, 8, 2),
+            FlatStyle = FlatStyle.Flat,
             ForeColor = Theme.Text, BackColor = Theme.TabBack, Font = Theme.UiFont,
             Margin = new Padding(3, 0, 3, 0), Cursor = Cursors.Hand
         };
@@ -384,11 +387,13 @@ public sealed class WorkspaceView : UserControl
         return b;
     }
 
-    private static Button MakeActionButton(string text, int width, int leftMargin, EventHandler onClick)
+    private static Button MakeActionButton(string text, int minWidth, int leftMargin, EventHandler onClick)
     {
         var b = new Button
         {
-            Text = text, AutoSize = false, Size = new Size(width, 26), FlatStyle = FlatStyle.Flat,
+            Text = text, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            MinimumSize = new Size(minWidth, 26), Padding = new Padding(10, 2, 10, 2),
+            FlatStyle = FlatStyle.Flat,
             ForeColor = Theme.Text, BackColor = Theme.TabBack, Font = Theme.UiFont,
             Margin = new Padding(leftMargin, 0, 3, 0), Cursor = Cursors.Hand
         };

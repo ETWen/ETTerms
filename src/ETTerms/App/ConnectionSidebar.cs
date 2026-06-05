@@ -49,10 +49,11 @@ public sealed class ConnectionSidebar : UserControl
         BackColor = Theme.SidebarBack;
 
         // ── Tab bar (Sessions / SFTP) ──
+        // 高度 40 與右側 Workspace 工具列對齊，讓「CONNECTIONS / 連線清單」與右側分頁列同一條基準線
         var tabBar = new FlowLayoutPanel
         {
-            Dock = DockStyle.Top, Height = 30, BackColor = Theme.RailBack,
-            Padding = new Padding(4, 3, 4, 0), WrapContents = false
+            Dock = DockStyle.Top, Height = 40, BackColor = Theme.RailBack,
+            Padding = new Padding(4, 7, 4, 0), WrapContents = false
         };
 
         var sessionsPanel = new Panel { Dock = DockStyle.Fill, BackColor = Theme.SidebarBack };
@@ -63,7 +64,9 @@ public sealed class ConnectionSidebar : UserControl
         {
             var b = new Button
             {
-                Text = text, Width = 70, Height = 24, FlatStyle = FlatStyle.Flat,
+                Text = text, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                MinimumSize = new Size(70, 24), Padding = new Padding(8, 2, 8, 2),
+                FlatStyle = FlatStyle.Flat,
                 ForeColor = Theme.Text, BackColor = Theme.TabBack, Font = Theme.UiFont,
                 Margin = new Padding(0, 0, 4, 0), Cursor = Cursors.Hand
             };
@@ -217,7 +220,9 @@ public sealed class ConnectionSidebar : UserControl
         var sshCombo = new ComboBox { Width = 120, DropDownStyle = ComboBoxStyle.DropDownList, BackColor = Theme.TabBack, ForeColor = Theme.Text, Font = Theme.UiFont };
         var connectBtn = new Button
         {
-            Text = "Connect", Width = 64, Height = 24, FlatStyle = FlatStyle.Flat,
+            Text = "Connect", AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            MinimumSize = new Size(64, 24), Padding = new Padding(8, 2, 8, 2),
+            FlatStyle = FlatStyle.Flat,
             ForeColor = Theme.Text, BackColor = Theme.TabBack, Font = Theme.UiFont, Cursor = Cursors.Hand, Margin = new Padding(4, 0, 0, 0)
         };
         connectBtn.FlatAppearance.BorderColor = Theme.SerialColor;

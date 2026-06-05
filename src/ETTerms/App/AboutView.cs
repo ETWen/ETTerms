@@ -21,7 +21,7 @@ public sealed class AboutView : UserControl
         var left = new FlowLayoutPanel
         {
             Dock = DockStyle.Left, Width = 380, FlowDirection = FlowDirection.TopDown,
-            WrapContents = false, AutoScroll = false, Padding = new Padding(20),
+            WrapContents = false, AutoScroll = true, Padding = new Padding(20),
             BackColor = Theme.WorkspaceBack
         };
 
@@ -73,7 +73,7 @@ public sealed class AboutView : UserControl
         {
             var header = new Label
             {
-                AutoSize = false, Width = 500, Height = 22,
+                AutoSize = true,
                 Text = $"● v{entry.Version}  ·  {entry.Title}    ({entry.Date:yyyy-MM-dd})",
                 ForeColor = Theme.Accent, Font = Theme.UiFontBold,
                 Margin = new Padding(0, 8, 0, 2)
@@ -83,7 +83,7 @@ public sealed class AboutView : UserControl
             {
                 right.Controls.Add(new Label
                 {
-                    AutoSize = false, Width = 500, Height = 20,
+                    AutoSize = true,
                     Text = $"    • {change}",
                     ForeColor = Theme.Text, Font = Theme.UiFont,
                     Margin = new Padding(0)
@@ -99,18 +99,17 @@ public sealed class AboutView : UserControl
 
     private static Panel MakeCard(int width, int height, Action<FlowLayoutPanel> build)
     {
-        var card = new Panel
+        // 卡片本身就是 TopDown 的 AutoSize FlowLayoutPanel：高度永遠長到容得下內容
+        // （高 DPI 字變大也不會被裁），MinimumSize 維持 100% 的設計尺寸。
+        var card = new FlowLayoutPanel
         {
-            Width = width, Height = height, Margin = new Padding(0, 0, 0, 12),
+            FlowDirection = FlowDirection.TopDown, WrapContents = false,
+            AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            MinimumSize = new Size(width, height),
+            Margin = new Padding(0, 0, 0, 12),
             BackColor = Theme.TabBack, Padding = new Padding(12)
         };
-        var flow = new FlowLayoutPanel
-        {
-            Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown,
-            WrapContents = false, BackColor = Theme.TabBack, AutoSize = false
-        };
-        build(flow);
-        card.Controls.Add(flow);
+        build(card);
         return card;
     }
 
@@ -149,24 +148,31 @@ public sealed class AboutView : UserControl
     {
         return new Label
         {
-            AutoSize = false, Width = 310, Height = 20,
+            AutoSize = true,
             Text = text, Font = font, ForeColor = color,
-            TextAlign = align, Margin = new Padding(0)
+            TextAlign = align, Margin = new Padding(0, 1, 0, 1)
         };
     }
 
-    private static Panel MakeRow(string label, string value)
+    private static Control MakeRow(string label, string value)
     {
-        var row = new Panel { Width = 310, Height = 20, Margin = new Padding(0, 2, 0, 0), BackColor = Color.Transparent };
+        var row = new FlowLayoutPanel
+        {
+            AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            FlowDirection = FlowDirection.LeftToRight, WrapContents = false,
+            Margin = new Padding(0, 2, 0, 0), BackColor = Color.Transparent
+        };
         row.Controls.Add(new Label
         {
-            Text = value, AutoSize = false, Width = 230, Height = 20, Dock = DockStyle.Right,
-            ForeColor = Theme.Text, Font = Theme.UiFont, TextAlign = ContentAlignment.MiddleRight
+            Text = label, AutoSize = true, MinimumSize = new Size(70, 0),
+            ForeColor = Theme.TextDim, Font = Theme.UiFont,
+            TextAlign = ContentAlignment.MiddleLeft, Margin = new Padding(0, 0, 8, 0)
         });
         row.Controls.Add(new Label
         {
-            Text = label, AutoSize = false, Width = 70, Height = 20, Dock = DockStyle.Left,
-            ForeColor = Theme.TextDim, Font = Theme.UiFont, TextAlign = ContentAlignment.MiddleLeft
+            Text = value, AutoSize = true,
+            ForeColor = Theme.Text, Font = Theme.UiFont,
+            TextAlign = ContentAlignment.MiddleLeft, Margin = new Padding(0)
         });
         return row;
     }
