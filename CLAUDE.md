@@ -10,6 +10,8 @@ ETTerms 是一個 **C# .NET 8 WinForms** 的原生 Windows 終端機工作台，
 
 **進度：** Phase 1–5 ✅、Phase 6 ✅（TTL 引擎 + Group 同步，SSH 待驗收）、Phase 7 ✅（Settings/About）、Phase 8 ✅（PDU + Shell/ConPTY + SFTP + Settings 擴充）、Phase 9 ✅（Serial MCP server：**GUI 持有 COM port，MCP 經本機 named pipe 橋接**，AI 收發的資料即時以 `[AI]` 標色顯示在 GUI）。打包待指示。
 
+**v0.3.1：** 終端機體驗修正（皆在 `src/ETTerms/Terminal/`）。**(1) 深色垂直捲軸** — 新增自繪 `DarkScrollBar`（細長、無箭頭、圓角滑塊，配合 KKTerm 深色主題），`TerminalView` 右側 `Dock=Right` 掛上，`ContentWidth` 扣掉捲軸寬避免文字被蓋，`UpdateScrollBar()` 在 `Feed` / 滾輪 / resize 時同步滑塊範圍與位置，滾輪與拖曳互通。**(2) 多行貼上修正** — `AnsiParser` 新增 `BracketedPaste`（DEC mode 2004）；`TerminalView.Paste()` 在對方啟用 bracketed paste（PSReadLine / Kiro CLI 等）時以 `ESC[200~ … ESC[201~` 包夾整段，視為「單次貼上」而非逐行 Enter 立即送出；未啟用時退回原本逐字送出。**(3) 右鍵複製清反白** — 右鍵複製後清掉 `_hasSel` 並重繪，讓使用者知道已複製。
+
 **v0.3.0：** 新增 **`ETTerms.PduMcp`**（stdio MCP server）：讓 AI agent 直接控制 SNMP PDU 插座。與 serial 不同，PDU 走 SNMP(UDP) **非獨佔**，故 PduMcp **直接打 SNMP、不經 GUI 橋接**（內含精簡版 `PduController`，OID 邏輯複製自 GUI 版，log 走 stderr），GUI 不開著也能用。工具：`pdu_connect` / `pdu_list` / `pdu_set_port` / `pdu_get_port` / `pdu_status` / `pdu_power_cycle` / `pdu_disconnect`，回傳統一 `{ok, result/error}` JSON；連線狀態以行程內單例 `PduRegistry`（IP→controller）保存。`McpRegistrar` 改為多 server，**Settings → AI MCP 一鍵同時註冊 `etterms-serial` 與 `etterms-pdu`**；`ETTerms.csproj` 的 publish target 更名 `PublishMcpServers`，GUI publish 會把兩個 MCP 各自帶到 `\ETTerms.SerialMcp\`、`\ETTerms.PduMcp\` 子資料夾。
 
 **v0.2.1：** 新增 GUI **Settings → AI MCP** 分頁（`McpRegistrar`）：對 Claude Code（`~/.claude.json`）與 Kiro（`~/.kiro/settings/mcp.json`）**一鍵 Setup / Remove** 註冊 `etterms-serial` MCP server，read-modify-write 保留檔內其他設定、原子寫回；卡片附 CLI 驗證指令。`ETTerms.csproj` 加 publish target（`AfterTargets=Publish`），GUI publish 會自動把 MCP server 帶到子資料夾，與 `McpRegistrar.ResolveServerExe()` 解析路徑對齊。

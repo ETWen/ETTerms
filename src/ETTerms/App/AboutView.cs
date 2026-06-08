@@ -183,12 +183,18 @@ public sealed class AboutView : UserControl
 
     private static readonly ChangelogEntry[] Changelog =
     [
-        new("0.3.0", new DateOnly(2026, 6, 8), "feat: PDU MCP server",
+        new("0.3.1", new DateOnly(2026, 6, 8), "Bugfix — terminal usability",
         [
-            "New ETTerms.PduMcp server: AI agents (Kiro / Claude CLI) can now control SNMP PDU outlets directly.",
-            "Tools: pdu_connect / pdu_list / pdu_set_port / pdu_get_port / pdu_status / pdu_power_cycle / pdu_disconnect.",
-            "PDU runs over SNMP, so the AI can power-cycle a DUT without the GUI session being open.",
-            "Settings → AI MCP now registers both Serial and PDU MCP servers with one click.",
+            "Added a scrollbar on the right of the terminal — just drag it to look back through long output, instead of spinning the mouse wheel for ages.",
+            "Fixed pasting multiple lines into Kiro CLI (and similar tools): the whole block now pastes in one go, instead of each line being sent off immediately.",
+            "After you right-click to copy, the highlight now clears so you can tell the copy actually worked.",
+        ]),
+        new("0.3.0", new DateOnly(2026, 6, 8), "AI power control for PDU outlets",
+        [
+            "AI assistants (Kiro / Claude) can now switch your PDU power outlets on and off for you.",
+            "Great for automated testing — the AI can power-cycle (restart) a connected device by itself.",
+            "Works even when the main ETTerms window isn't open.",
+            "One click in Settings → AI MCP now sets up both the Serial and PDU AI helpers at the same time.",
         ]),
         new("0.2.2", new DateOnly(2026, 6, 5), "Bugfix — terminal stability",
         [

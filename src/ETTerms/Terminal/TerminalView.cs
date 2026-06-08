@@ -17,6 +17,8 @@ public sealed class TerminalView : UserControl
     private readonly ScreenBuffer _buf;
     private readonly AnsiParser _parser;
     private readonly Font _font;
+    private readonly DarkScrollBar _vscroll;     // 右側深色垂直捲軸（可拖曳捲動 scrollback）
+    private bool _suppressScroll;                // 程式設定捲軸值時抑制回呼
     private int _cellW, _cellH;
     private int _scrollOffset;                  // 0 = 貼底；>0 = 往上看 scrollback
     private int _lastCols = -1, _lastRows = -1;
@@ -42,6 +44,11 @@ public sealed class TerminalView : UserControl
         _buf = new ScreenBuffer(profile.Cols, profile.Rows,
             Color.FromArgb(220, 220, 220), BackColor, profile.ScrollbackLines);
         _parser = new AnsiParser(_buf);
+
+        // 右側深色垂直捲軸：拖曳即捲動 scrollback。內容寬度會扣掉捲軸寬，故文字不會被蓋住。
+        _vscroll = new DarkScrollBar { Dock = DockStyle.Right, SmallChange = 1, Minimum = 0, Maximum = 0 };
+        _vscroll.Scroll += OnVScroll;
+        Controls.Add(_vscroll);
     }
 
     /// <summary>餵入遠端資料（須在 UI thread 呼叫）。</summary>
@@ -49,11 +56,13 @@ public sealed class TerminalView : UserControl
     {
         _parser.Feed(data);
         _scrollOffset = 0;          // 新輸出貼底
+        UpdateScrollBar();
         Invalidate();
     }
 
+    private int ContentWidth => Math.Max(_cellW, ClientSize.Width - (_vscroll?.Width ?? 0));
     private int VisibleRows => Math.Max(1, ClientSize.Height / _cellH);
-    private int VisibleCols => Math.Max(1, ClientSize.Width / _cellW);
+    private int VisibleCols => Math.Max(1, ContentWidth / _cellW);
 
     // ── resize → 通知 PTY ────────────────────────────────────
     protected override void OnSizeChanged(EventArgs e)
@@ -71,6 +80,7 @@ public sealed class TerminalView : UserControl
         _lastCols = cols; _lastRows = rows;
         _buf.Resize(cols, rows);
         Resized?.Invoke(cols, rows);
+        UpdateScrollBar();
         Invalidate();
     }
 
@@ -188,7 +198,45 @@ public sealed class TerminalView : UserControl
     {
         int delta = e.Delta / 120 * 3;
         _scrollOffset = Math.Clamp(_scrollOffset + delta, 0, _buf.ScrollbackCount);
+        UpdateScrollBar();
         Invalidate();
+    }
+
+    // ── 垂直捲軸 ─────────────────────────────────────────────
+    private void OnVScroll(object? sender, EventArgs e)
+    {
+        if (_suppressScroll) return;
+        // 捲軸值 = 視窗第一列的絕對 index；_scrollOffset = 距底部的列數。
+        _scrollOffset = Math.Clamp(_buf.ScrollbackCount - _vscroll.Value, 0, _buf.ScrollbackCount);
+        Invalidate();
+    }
+
+    /// <summary>依目前 scrollback / 捲動位置同步捲軸的範圍與滑塊位置。</summary>
+    private void UpdateScrollBar()
+    {
+        if (_vscroll is null) return;
+        _suppressScroll = true;
+        try
+        {
+            int visible = VisibleRows;
+            int total = _buf.TotalRows;
+            if (_buf.ScrollbackCount <= 0)
+            {
+                _vscroll.Enabled = false;
+                _vscroll.LargeChange = 1;
+                _vscroll.Maximum = 0;
+                _vscroll.Value = 0;
+                return;
+            }
+            _vscroll.Enabled = true;
+            // 先設 LargeChange/Maximum 再設 Value，避免 Value 超出可達範圍被夾掉。
+            _vscroll.LargeChange = Math.Max(1, visible);
+            _vscroll.Maximum = Math.Max(0, total - 1);
+            int top = _buf.ScrollbackCount - _scrollOffset;          // 視窗第一列絕對 index
+            int maxValue = Math.Max(0, _vscroll.Maximum - _vscroll.LargeChange + 1);
+            _vscroll.Value = Math.Clamp(top, 0, maxValue);
+        }
+        finally { _suppressScroll = false; }
     }
 
     protected override void OnMouseDown(MouseEventArgs e)
@@ -202,7 +250,8 @@ public sealed class TerminalView : UserControl
         }
         else if (e.Button == MouseButtons.Right)
         {
-            if (_hasSel) CopySelection(); else Paste();
+            if (_hasSel) { CopySelection(); _hasSel = false; Invalidate(); }   // 複製後清掉反白，讓 user 知道已動作
+            else Paste();
         }
     }
 
@@ -264,8 +313,17 @@ public sealed class TerminalView : UserControl
     {
         try
         {
-            if (Clipboard.ContainsText())
-                SendData?.Invoke(Encoding.UTF8.GetBytes(Clipboard.GetText().Replace("\r\n", "\r")));
+            if (!Clipboard.ContainsText()) return;
+            // 換行統一成 CR：剪貼簿多為 \r\n，也處理單獨的 \n。
+            var text = Clipboard.GetText().Replace("\r\n", "\r").Replace('\n', '\r');
+
+            // 應用程式啟用 bracketed paste（PSReadLine / Kiro CLI 等）時，以 ESC[200~ … ESC[201~
+            // 包夾整段貼上內容，讓對方視為「單次貼上」而非逐行 Enter 立即送出；
+            // 未啟用時才退回原本逐字送出（一般 shell 的預期行為）。
+            var data = _parser.BracketedPaste
+                ? Encoding.UTF8.GetBytes("\x1b[200~" + text + "\x1b[201~")
+                : Encoding.UTF8.GetBytes(text);
+            SendData?.Invoke(data);
         }
         catch { }
     }
