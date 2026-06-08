@@ -8,16 +8,25 @@ namespace ETTerms.Infrastructure;
 public enum McpTarget { Claude, Kiro }
 
 /// <summary>
-/// 把 ETTerms 的 Serial MCP server（<c>ETTerms.SerialMcp</c>）一鍵註冊 / 移除到
-/// 各 AI CLI 的「使用者層級」MCP 設定檔。採 read-modify-write，保留檔內其他既有伺服器。
+/// 把 ETTerms 的 MCP servers（<c>ETTerms.SerialMcp</c> 與 <c>ETTerms.PduMcp</c>）一鍵註冊 /
+/// 移除到各 AI CLI 的「使用者層級」MCP 設定檔。採 read-modify-write，保留檔內其他既有伺服器。
 ///
 /// - Claude Code：<c>~/.claude.json</c> 頂層 <c>mcpServers</c>，entry 需 <c>type:"stdio"</c>。
 /// - Kiro：<c>%USERPROFILE%\.kiro\settings\mcp.json</c> 頂層 <c>mcpServers</c>。
+///
+/// 兩個 server 一起註冊 / 移除（一鍵同時設定 serial 與 pdu）。
 /// </summary>
 public static class McpRegistrar
 {
-    /// <summary>註冊到各 CLI 時用的 MCP server 名稱。</summary>
-    public const string ServerName = "etterms-serial";
+    /// <summary>一個可被註冊的 MCP server 描述：CLI 內名稱 + 發佈子資料夾 + 執行檔名。</summary>
+    public sealed record McpServer(string Name, string PublishFolder, string ExeName);
+
+    /// <summary>ETTerms 提供的所有 MCP servers。</summary>
+    public static readonly IReadOnlyList<McpServer> Servers = new[]
+    {
+        new McpServer("etterms-serial", "ETTerms.SerialMcp", "ETTerms.SerialMcp.exe"),
+        new McpServer("etterms-pdu",    "ETTerms.PduMcp",    "ETTerms.PduMcp.exe"),
+    };
 
     public static string DisplayName(McpTarget t) => t switch
     {
@@ -43,33 +52,33 @@ public static class McpRegistrar
     {
         McpTarget.Claude =>
             "claude mcp list\r\n" +
-            $"#  應看到：{ServerName}  ✓ Connected\r\n" +
-            $"#  細節：  claude mcp get {ServerName}",
+            "#  應看到：etterms-serial / etterms-pdu  ✓ Connected\r\n" +
+            "#  細節：  claude mcp get etterms-pdu",
         McpTarget.Kiro =>
             "kiro-cli mcp list\r\n" +
-            $"kiro-cli mcp status --name {ServerName}\r\n" +
+            "kiro-cli mcp status --name etterms-pdu\r\n" +
             "#  或在 Kiro IDE：點 ghost 圖示開 MCP Servers 面板查看狀態",
         _ => ""
     };
 
-    /// <summary>找出 ETTerms.SerialMcp 執行檔路徑（找不到回傳最可能的位置作為註冊值）。</summary>
-    public static string ResolveServerExe()
+    /// <summary>找出某個 MCP server 執行檔路徑（找不到回傳最可能的位置作為註冊值）。</summary>
+    public static string ResolveServerExe(McpServer server)
     {
         var baseDir = AppContext.BaseDirectory;
         var candidates = new List<string>
         {
-            Path.Combine(baseDir, "ETTerms.SerialMcp", "ETTerms.SerialMcp.exe"), // 發佈版（子資料夾）
-            Path.Combine(baseDir, "ETTerms.SerialMcp.exe"),                       // 同層
+            Path.Combine(baseDir, server.PublishFolder, server.ExeName), // 發佈版（子資料夾）
+            Path.Combine(baseDir, server.ExeName),                       // 同層
         };
 
-        // 開發版 fallback：src\ETTerms\bin\<cfg>\net8.0-windows → src\ETTerms.SerialMcp\bin\<cfg>\net8.0
+        // 開發版 fallback：src\ETTerms\bin\<cfg>\net8.0-windows → src\<folder>\bin\<cfg>\net8.0
         try
         {
             var binCfg = new DirectoryInfo(baseDir);          // ...\net8.0-windows
             var config = binCfg.Parent?.Name ?? "Debug";       // Debug / Release
             var srcDir = binCfg.Parent?.Parent?.Parent?.Parent; // ...\src
             if (srcDir != null)
-                candidates.Add(Path.Combine(srcDir.FullName, "ETTerms.SerialMcp", "bin", config, "net8.0", "ETTerms.SerialMcp.exe"));
+                candidates.Add(Path.Combine(srcDir.FullName, server.PublishFolder, "bin", config, "net8.0", server.ExeName));
         }
         catch { /* 路徑推導失敗就略過開發版 fallback */ }
 
@@ -78,22 +87,34 @@ public static class McpRegistrar
         return candidates[0]; // 都找不到 → 回發佈版預期位置
     }
 
-    public static bool ServerExeExists() => File.Exists(ResolveServerExe());
+    /// <summary>所有 server 執行檔是否都存在。</summary>
+    public static bool ServerExeExists() => Servers.All(s => File.Exists(ResolveServerExe(s)));
 
-    /// <summary>該目標是否已註冊 etterms-serial。</summary>
+    /// <summary>列出每個 server 的解析路徑與是否存在（給 UI 顯示）。</summary>
+    public static IEnumerable<(string Name, string Exe, bool Exists)> ServerInfos()
+    {
+        foreach (var s in Servers)
+        {
+            var exe = ResolveServerExe(s);
+            yield return (s.Name, exe, File.Exists(exe));
+        }
+    }
+
+    /// <summary>該目標是否已註冊「全部」ETTerms MCP servers。</summary>
     public static bool IsRegistered(McpTarget t)
     {
         try
         {
             var path = ConfigPath(t);
             if (!File.Exists(path)) return false;
-            var root = JsonNode.Parse(File.ReadAllText(path)) as JsonObject;
-            return (root?["mcpServers"] as JsonObject)?[ServerName] != null;
+            var servers = (JsonNode.Parse(File.ReadAllText(path)) as JsonObject)?["mcpServers"] as JsonObject;
+            if (servers == null) return false;
+            return Servers.All(s => servers[s.Name] != null);
         }
         catch { return false; }
     }
 
-    /// <summary>註冊（或更新）etterms-serial 到該目標設定檔。</summary>
+    /// <summary>註冊（或更新）所有 ETTerms MCP servers 到該目標設定檔。</summary>
     public static void Register(McpTarget t)
     {
         var path = ConfigPath(t);
@@ -106,27 +127,34 @@ public static class McpRegistrar
             servers = new JsonObject();
             root["mcpServers"] = servers;
         }
-        servers[ServerName] = BuildEntry(t);
+        foreach (var s in Servers)
+            servers[s.Name] = BuildEntry(t, s);
         WriteRoot(path, root);
         AppLogger.Info($"MCP registered to {DisplayName(t)} at {path}");
     }
 
-    /// <summary>從該目標設定檔移除 etterms-serial。</summary>
+    /// <summary>從該目標設定檔移除所有 ETTerms MCP servers。</summary>
     public static void Unregister(McpTarget t)
     {
         var path = ConfigPath(t);
         if (!File.Exists(path)) return;
         var root = LoadRoot(path);
-        if (root["mcpServers"] is JsonObject servers && servers.Remove(ServerName))
+        if (root["mcpServers"] is JsonObject servers)
         {
-            WriteRoot(path, root);
-            AppLogger.Info($"MCP unregistered from {DisplayName(t)} at {path}");
+            bool changed = false;
+            foreach (var s in Servers)
+                changed |= servers.Remove(s.Name);
+            if (changed)
+            {
+                WriteRoot(path, root);
+                AppLogger.Info($"MCP unregistered from {DisplayName(t)} at {path}");
+            }
         }
     }
 
-    private static JsonObject BuildEntry(McpTarget t)
+    private static JsonObject BuildEntry(McpTarget t, McpServer server)
     {
-        var exe = ResolveServerExe();
+        var exe = ResolveServerExe(server);
         return t switch
         {
             // Claude Code：stdio server 需 type 欄位
