@@ -19,6 +19,10 @@ public sealed class AnsiParser
     /// <summary>DECCKM：application cursor keys（影響方向鍵送出序列）。</summary>
     public bool AppCursorKeys { get; private set; }
 
+    /// <summary>DEC mode 2004：bracketed paste。啟用時貼上內容須以 ESC[200~ / ESC[201~ 包夾，
+    /// 讓 PSReadLine / Kiro CLI 等把多行貼上視為單一輸入而非逐行立即送出。</summary>
+    public bool BracketedPaste { get; private set; }
+
     public AnsiParser(ScreenBuffer buffer) => _b = buffer;
 
     public void Feed(byte[] data)
@@ -138,6 +142,7 @@ public sealed class AnsiParser
                 case 25: _b.CursorVisible = set; break;
                 case 7: _b.AutoWrap = set; break;
                 case 1: AppCursorKeys = set; break;
+                case 2004: BracketedPaste = set; break;
                 case 47: case 1047: case 1049:
                     if (set) _b.EnterAlt(); else _b.ExitAlt(); break;
             }
