@@ -4,7 +4,7 @@
 
 > 原生 Windows 終端機工作台（C# .NET 8 WinForms）—— 一個視窗整合 **SSH**、**Serial Port**、**本機 Shell (ConPTY)** 連線，內建從 MyTeraTerm 移植的 **TTL 腳本引擎**做自動化，並提供選用的 **Serial MCP server**，讓 AI agent（Kiro CLI / Claude CLI）直接操作 serial port。單機、無雲、無登入系統。
 
-![version](https://img.shields.io/badge/version-0.2.1-blue.svg) ![platform](https://img.shields.io/badge/platform-Windows-0078D6.svg?logo=windows&logoColor=white) ![.NET](https://img.shields.io/badge/.NET-8.0-512BD4.svg?logo=dotnet&logoColor=white) ![UI](https://img.shields.io/badge/UI-WinForms-5C2D91.svg) ![SSH](https://img.shields.io/badge/SSH-SSH.NET-success.svg) ![Serial](https://img.shields.io/badge/Serial-System.IO.Ports-success.svg) ![status](https://img.shields.io/badge/status-beta-yellow.svg) ![license](https://img.shields.io/badge/license-MIT-green.svg)
+![version](https://img.shields.io/badge/version-0.3.1-blue.svg) ![platform](https://img.shields.io/badge/platform-Windows-0078D6.svg?logo=windows&logoColor=white) ![.NET](https://img.shields.io/badge/.NET-8.0-512BD4.svg?logo=dotnet&logoColor=white) ![UI](https://img.shields.io/badge/UI-WinForms-5C2D91.svg) ![SSH](https://img.shields.io/badge/SSH-SSH.NET-success.svg) ![Serial](https://img.shields.io/badge/Serial-System.IO.Ports-success.svg) ![status](https://img.shields.io/badge/status-beta-yellow.svg) ![license](https://img.shields.io/badge/license-MIT-green.svg)
 
 ---
 
@@ -77,9 +77,10 @@
 ### 終端機渲染
 
 - 🎨 自繪 VT100 / ANSI 控制項（owner-drawn），雙緩衝繪字格
-- 🌑 KKTerm 風格深色主題（含 DWM 深色標題列）
+- 🌑 KKTerm 風格深色主題（含 DWM 深色標題列 + 深色終端機捲軸）
 - 🔤 可調字型 / 字級 / 配色 / scrollback 行數
-- 📋 選取 / 複製 / 貼上
+- 🖱️ 用滑鼠滾輪或深色捲軸往回捲長輸出
+- 📋 選取 / 複製 / 貼上 —— 右鍵複製會清掉反白；多行貼上採 **bracketed paste**，不會被逐行送出
 
 ---
 
@@ -401,6 +402,25 @@ ETTerms/
 ---
 
 ## 📜 版本紀錄
+
+### v0.3.1
+
+- **終端機體驗修正** —— 新增**深色垂直捲軸**（拖曳滑塊或點軌道翻頁，不必狂滾滑鼠看長輸出）
+- 貼多行到 Kiro CLI / PSReadLine 現在會**整段一次貼上**（**bracketed paste**，DEC mode 2004），不再逐行立即送出
+- 右鍵複製後會**清掉反白**，讓你知道已複製
+
+### v0.3.0
+
+- **AI 控制 PDU 電源（MCP）** —— 新增 `ETTerms.PduMcp` server，讓 AI agent（Kiro CLI / Claude CLI）直接控制 SNMP PDU：插座開 / 關、讀狀態、自動化測試時 power-cycle 一台 DUT
+- PDU 走 SNMP（UDP，非獨佔），AI 直接打 PDU —— ETTerms GUI 不需開著
+- 工具：`pdu_connect` / `pdu_list` / `pdu_set_port` / `pdu_get_port` / `pdu_status` / `pdu_power_cycle` / `pdu_disconnect`
+- **設定 → AI MCP** 一鍵同時註冊 `etterms-serial` 與 `etterms-pdu`；publish 會自動把兩個 MCP server 一併打包
+
+### v0.2.2
+
+- **終端機穩定性** —— 視窗最小化或切換分頁後終端機不再卡住（跑全螢幕 TUI 如 PowerShell 裡的 Kiro CLI 最明顯）；不再把退化的 1×1 尺寸送給 pseudo-console
+- **Shift+Enter** 在 shell 插入換行，可輸入多行指令（單純 Enter 仍是送出）
+- **高 DPI 修正** —— 125% / 150% 縮放下文字與按鈕不再被裁切（PerMonitorV2）；toolbar / 設定 / 側欄 / About 改為自適應縮放
 
 ### v0.2.1
 

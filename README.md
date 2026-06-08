@@ -4,7 +4,7 @@
 
 > A native Windows terminal workspace (C# .NET 8 WinForms) — **SSH**, **Serial Port**, and **local Shell (ConPTY)** in one window, with a **TTL scripting engine** ported from MyTeraTerm for automation, plus an optional **Serial MCP server** that lets AI agents (Kiro CLI / Claude CLI) drive the serial port directly. Standalone, no cloud, no login.
 
-![version](https://img.shields.io/badge/version-0.2.1-blue.svg) ![platform](https://img.shields.io/badge/platform-Windows-0078D6.svg?logo=windows&logoColor=white) ![.NET](https://img.shields.io/badge/.NET-8.0-512BD4.svg?logo=dotnet&logoColor=white) ![UI](https://img.shields.io/badge/UI-WinForms-5C2D91.svg) ![SSH](https://img.shields.io/badge/SSH-SSH.NET-success.svg) ![Serial](https://img.shields.io/badge/Serial-System.IO.Ports-success.svg) ![status](https://img.shields.io/badge/status-beta-yellow.svg) ![license](https://img.shields.io/badge/license-MIT-green.svg)
+![version](https://img.shields.io/badge/version-0.3.1-blue.svg) ![platform](https://img.shields.io/badge/platform-Windows-0078D6.svg?logo=windows&logoColor=white) ![.NET](https://img.shields.io/badge/.NET-8.0-512BD4.svg?logo=dotnet&logoColor=white) ![UI](https://img.shields.io/badge/UI-WinForms-5C2D91.svg) ![SSH](https://img.shields.io/badge/SSH-SSH.NET-success.svg) ![Serial](https://img.shields.io/badge/Serial-System.IO.Ports-success.svg) ![status](https://img.shields.io/badge/status-beta-yellow.svg) ![license](https://img.shields.io/badge/license-MIT-green.svg)
 
 ---
 
@@ -77,9 +77,10 @@
 ### Terminal Rendering
 
 - 🎨 Owner-drawn VT100 / ANSI control, double-buffered cell grid
-- 🌑 KKTerm-style dark theme (incl. DWM dark title bar)
+- 🌑 KKTerm-style dark theme (incl. DWM dark title bar + dark terminal scrollbar)
 - 🔤 Configurable font / size / palette / scrollback
-- 📋 Select / copy / paste
+- 🖱️ Scroll back through long output with the mouse wheel or the dark scrollbar
+- 📋 Select / copy / paste — right-click copy clears the highlight; multi-line paste uses **bracketed paste** so it isn't submitted line-by-line
 
 ---
 
@@ -401,6 +402,25 @@ ETTerms/
 ---
 
 ## 📜 Version History
+
+### v0.3.1
+
+- **Terminal usability fixes** — added a **dark vertical scrollbar** (drag or click-to-page through long output instead of long mouse-wheel scrolling)
+- **Multi-line paste** into Kiro CLI / PSReadLine now pastes as a single block (**bracketed paste**, DEC mode 2004) instead of submitting each line immediately
+- Right-click copy now **clears the highlight** so you know it worked
+
+### v0.3.0
+
+- **AI-driven PDU power control (MCP)** — new `ETTerms.PduMcp` server lets AI agents (Kiro CLI / Claude CLI) control an SNMP PDU directly: outlets on/off, status, and power-cycle a DUT during automated tests
+- PDU runs over SNMP (UDP, non-exclusive), so the AI talks to it directly — the ETTerms GUI does not need to be running
+- Tools: `pdu_connect` / `pdu_list` / `pdu_set_port` / `pdu_get_port` / `pdu_status` / `pdu_power_cycle` / `pdu_disconnect`
+- **Settings → AI MCP** now registers both `etterms-serial` and `etterms-pdu` with one click; publishing the GUI auto-bundles both MCP servers
+
+### v0.2.2
+
+- **Terminal stability** — the terminal no longer freezes after minimizing or switching tabs (most noticeable with full-screen TUIs like Kiro CLI in PowerShell); a degenerate 1×1 size is no longer sent to the pseudo-console
+- **Shift+Enter** inserts a newline in the shell, so you can type multi-line commands (plain Enter still submits)
+- **High-DPI fixes** — text and buttons no longer clipped at 125% / 150% scaling (PerMonitorV2); toolbar / settings / sidebar / About now scale adaptively
 
 ### v0.2.1
 
