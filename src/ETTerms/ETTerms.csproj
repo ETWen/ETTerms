@@ -10,7 +10,7 @@
     <AssemblyName>ETTerms</AssemblyName>
 
     <!-- 版本資訊 -->
-    <Version>0.2.2</Version>
+    <Version>0.3.0</Version>
     <Product>ETTerms</Product>
     <Company>ETTerms Project</Company>
 
@@ -36,13 +36,13 @@
   </ItemGroup>
 
   <!--
-    發佈 GUI 時，自動把 Serial MCP server 一併發佈到 <publish>\ETTerms.SerialMcp\ 子資料夾。
+    發佈 GUI 時，自動把 MCP servers（Serial + PDU）一併發佈到 <publish>\<server>\ 子資料夾。
     這樣單一 `dotnet publish src\ETTerms` 就會產生完整自洽的 bundle，
-    且 McpRegistrar.ResolveServerExe() 解析的 <ETTerms.exe>\ETTerms.SerialMcp\ETTerms.SerialMcp.exe 必定存在。
+    且 McpRegistrar.ResolveServerExe() 解析的 <ETTerms.exe>\<server>\<server>.exe 必定存在。
     刻意放子資料夾：與 GUI 的相依 dll 隔離，避免互相覆蓋。
     MCP 跟隨 GUI 的 self-contained 設定：框架相依版 → MCP 也框架相依；portable(self-contained)版 → MCP 也免 runtime。
   -->
-  <Target Name="PublishSerialMcp" AfterTargets="Publish">
+  <Target Name="PublishMcpServers" AfterTargets="Publish">
     <PropertyGroup>
       <_McpRid Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</_McpRid>
       <_McpRid Condition="'$(RuntimeIdentifier)' == ''">win-x64</_McpRid>
@@ -51,6 +51,8 @@
     </PropertyGroup>
     <Message Importance="high" Text="[ETTerms] Publishing ETTerms.SerialMcp -> $(PublishDir)ETTerms.SerialMcp (self-contained=$(_McpSelfContained))" />
     <Exec Command="dotnet publish &quot;$(MSBuildThisFileDirectory)..\ETTerms.SerialMcp\ETTerms.SerialMcp.csproj&quot; -c $(Configuration) -r $(_McpRid) --self-contained $(_McpSelfContained) -o &quot;$(PublishDir)ETTerms.SerialMcp&quot;" />
+    <Message Importance="high" Text="[ETTerms] Publishing ETTerms.PduMcp -> $(PublishDir)ETTerms.PduMcp (self-contained=$(_McpSelfContained))" />
+    <Exec Command="dotnet publish &quot;$(MSBuildThisFileDirectory)..\ETTerms.PduMcp\ETTerms.PduMcp.csproj&quot; -c $(Configuration) -r $(_McpRid) --self-contained $(_McpSelfContained) -o &quot;$(PublishDir)ETTerms.PduMcp&quot;" />
   </Target>
 
 </Project>

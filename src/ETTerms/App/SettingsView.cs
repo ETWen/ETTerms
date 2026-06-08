@@ -291,28 +291,30 @@ public sealed class SettingsView : UserControl
         });
         flow.Controls.Add(new Label
         {
-            Text = "One-click register the ETTerms Serial MCP server into your AI CLI's user-level\n" +
-                   "config. ETTerms keeps sole ownership of the COM port; the AI drives serial through\n" +
-                   "a local named pipe. Open a Serial session in ETTerms first, then the AI can attach.",
-            AutoSize = false, Width = 600, Height = 56,
+            Text = "One-click register the ETTerms MCP servers (Serial + PDU) into your AI CLI's\n" +
+                   "user-level config. Serial: ETTerms owns the COM port, the AI drives it through a\n" +
+                   "local named pipe (open a Serial session first). PDU: the AI controls outlets\n" +
+                   "directly over SNMP — no GUI session required.",
+            AutoSize = false, Width = 600, Height = 64,
             ForeColor = Theme.TextDim, Font = Theme.UiFont, Margin = new Padding(0, 0, 0, 8)
         });
 
-        // Resolved MCP server exe
-        var exe = McpRegistrar.ResolveServerExe();
-        var exists = McpRegistrar.ServerExeExists();
-        flow.Controls.Add(new Label
-        {
-            Text = $"MCP server:  {exe}",
-            AutoSize = false, Width = 600, Height = 20,
-            ForeColor = exists ? Theme.SerialColor : Color.FromArgb(210, 150, 120),
-            Font = Theme.UiFont, Margin = new Padding(0, 0, 0, 2)
-        });
-        if (!exists)
+        // Resolved MCP server exes (serial + pdu)
+        foreach (var (name, exe, exists) in McpRegistrar.ServerInfos())
         {
             flow.Controls.Add(new Label
             {
-                Text = "⚠ Not found yet — publish the app (or build ETTerms.SerialMcp). Setup still writes this expected path.",
+                Text = $"{name}:  {exe}",
+                AutoSize = false, Width = 600, Height = 20,
+                ForeColor = exists ? Theme.SerialColor : Color.FromArgb(210, 150, 120),
+                Font = Theme.UiFont, Margin = new Padding(0, 0, 0, 2)
+            });
+        }
+        if (!McpRegistrar.ServerExeExists())
+        {
+            flow.Controls.Add(new Label
+            {
+                Text = "⚠ Some servers not built yet — publish the app (or build the MCP projects). Setup still writes the expected paths.",
                 AutoSize = false, Width = 600, Height = 20,
                 ForeColor = Color.FromArgb(210, 150, 120), Font = Theme.UiFont, Margin = new Padding(0, 0, 0, 4)
             });

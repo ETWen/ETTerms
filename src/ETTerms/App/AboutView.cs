@@ -183,6 +183,13 @@ public sealed class AboutView : UserControl
 
     private static readonly ChangelogEntry[] Changelog =
     [
+        new("0.3.0", new DateOnly(2026, 6, 8), "feat: PDU MCP server",
+        [
+            "New ETTerms.PduMcp server: AI agents (Kiro / Claude CLI) can now control SNMP PDU outlets directly.",
+            "Tools: pdu_connect / pdu_list / pdu_set_port / pdu_get_port / pdu_status / pdu_power_cycle / pdu_disconnect.",
+            "PDU runs over SNMP, so the AI can power-cycle a DUT without the GUI session being open.",
+            "Settings → AI MCP now registers both Serial and PDU MCP servers with one click.",
+        ]),
         new("0.2.2", new DateOnly(2026, 6, 5), "Bugfix — terminal stability",
         [
             "Fixed: the terminal no longer freezes after minimizing or switching tabs (notably in PowerShell / Kiro).",
