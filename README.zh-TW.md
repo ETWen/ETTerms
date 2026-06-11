@@ -4,7 +4,7 @@
 
 > 原生 Windows 終端機工作台（C# .NET 8 WinForms）—— 一個視窗整合 **SSH**、**Serial Port**、**本機 Shell (ConPTY)** 連線，內建從 MyTeraTerm 移植的 **TTL 腳本引擎**做自動化，並提供選用的 **Serial MCP server**，讓 AI agent（Kiro CLI / Claude CLI）直接操作 serial port。單機、無雲、無登入系統。
 
-![version](https://img.shields.io/badge/version-0.3.1-blue.svg) ![platform](https://img.shields.io/badge/platform-Windows-0078D6.svg?logo=windows&logoColor=white) ![.NET](https://img.shields.io/badge/.NET-8.0-512BD4.svg?logo=dotnet&logoColor=white) ![UI](https://img.shields.io/badge/UI-WinForms-5C2D91.svg) ![SSH](https://img.shields.io/badge/SSH-SSH.NET-success.svg) ![Serial](https://img.shields.io/badge/Serial-System.IO.Ports-success.svg) ![status](https://img.shields.io/badge/status-beta-yellow.svg) ![license](https://img.shields.io/badge/license-MIT-green.svg)
+![version](https://img.shields.io/badge/version-0.3.2-blue.svg) ![platform](https://img.shields.io/badge/platform-Windows-0078D6.svg?logo=windows&logoColor=white) ![.NET](https://img.shields.io/badge/.NET-8.0-512BD4.svg?logo=dotnet&logoColor=white) ![UI](https://img.shields.io/badge/UI-WinForms-5C2D91.svg) ![SSH](https://img.shields.io/badge/SSH-SSH.NET-success.svg) ![Serial](https://img.shields.io/badge/Serial-System.IO.Ports-success.svg) ![status](https://img.shields.io/badge/status-beta-yellow.svg) ![license](https://img.shields.io/badge/license-MIT-green.svg)
 
 ---
 
@@ -63,6 +63,7 @@
 
 - ⚡ **PDU 電源控制（選用）**
   - 透過 SNMP（`SnmpSharpNet`）控制 PDU 插座，測試中遠端電源循環
+  - **Status → PDU** 分頁：連線 PDU 後每 3 秒自動輪詢插座狀態，並可用各列的 **Control** 鈕直接開 / 關該 Port
   - 腳本指令：`pduconnect` / `pductrl`
 
 - 🤖 **AI / MCP 整合（選用）**
@@ -402,6 +403,11 @@ ETTerms/
 ---
 
 ## 📜 版本紀錄
+
+### v0.3.2
+
+- **Status → PDU 分頁** —— 新增 `Status` rail 檢視，PDU 面板移到此處：輸入 IP 連線後每 3 秒自動輪詢全部 12 個插座（背景執行緒，免手動 Refresh），即時顯示電流 / 功率
+- **手動插座開關鈕** —— 每列新增 **Control** 鈕，按一下即透過 SNMP 切換該 Port 開 / 關；按鈕文字隨狀態變動（ON →「Turn OFF」、OFF →「Turn ON」），SNMP 設定在 UI 執行緒外執行，下命令後自動回讀刷新表格
 
 ### v0.3.1
 

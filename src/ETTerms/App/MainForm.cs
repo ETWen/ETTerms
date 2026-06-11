@@ -14,6 +14,7 @@ public partial class MainForm : Form
     private readonly ActivityRail _rail = new();
     private readonly ConnectionSidebar _sidebar = new();
     private readonly WorkspaceView _workspace = new();
+    private readonly StatusView _statusView = new();
     private readonly SettingsView _settings = new();
     private readonly AboutView _about = new();
     private readonly StatusStrip _status = new();
@@ -45,11 +46,13 @@ public partial class MainForm : Form
     private void BuildLayout()
     {
         Controls.Add(_workspace);   // Fill
+        Controls.Add(_statusView);  // Fill (hidden)
         Controls.Add(_settings);    // Fill (hidden)
         Controls.Add(_about);       // Fill (hidden)
         Controls.Add(_sidebar);     // Left (內側)
         Controls.Add(_rail);        // Left (最外側)
 
+        _statusView.Visible = false;
         _settings.Visible = false;
         _about.Visible = false;
 
@@ -68,6 +71,7 @@ public partial class MainForm : Form
             _statusLabel.Text = $"View: {view}";
             _sidebar.Visible = view == ActivityRail.RailView.Terminal;
             _workspace.Visible = view == ActivityRail.RailView.Terminal;
+            _statusView.Visible = view == ActivityRail.RailView.Status;
             _settings.Visible = view == ActivityRail.RailView.Settings;
             _about.Visible = view == ActivityRail.RailView.About;
             AppLogger.LogInfo($"View selected: {view}");

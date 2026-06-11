@@ -118,8 +118,11 @@ ETTerms/
         │   ├── MainForm.cs         #   主視窗：Rail + Sidebar + Workspace（含深色標題列 DWM）
         │   ├── MainForm.Designer.cs
         │   ├── Theme.cs            #   全域深色配色 (KKTerm 風格)
-        │   ├── ActivityRail.cs     #   左側圖示列 (Terminal/Scripts/Settings)
+        │   ├── ActivityRail.cs     #   左側圖示列 (Terminal/Status/Settings/About)
         │   ├── ConnectionSidebar.cs#   仿 KKTerm 可編輯資料夾樹（搜尋/CRUD/拖曳分類）
+        │   ├── StatusView.cs       #   Status 檢視：分頁式（PDU…），PDU 連線後每 3 秒背景輪詢插座狀態，並可用表格內 Control 鈕直接開關各 Port
+        │   ├── SettingsView.cs     #   Settings 檢視：分頁式（Terminal / AI MCP）
+        │   ├── AboutView.cs        #   About 檢視（版本 / 連結）
         │   ├── Dialogs/            #   ── 深色對話框 ──
         │   │   ├── DarkDialog.cs       #   對話框基底（深色 + DWM 標題列）
         │   │   ├── TextPromptDialog.cs #   單行輸入（資料夾命名 / 改名）
@@ -140,7 +143,7 @@ ETTerms/
         │   ├── ISessionChannel.cs  #   Write(byte[]) + event DataReceived
         │   ├── SshChannel.cs       #   SSH.NET 實作 (ShellStream)
         │   ├── SerialChannel.cs    #   System.IO.Ports 實作
-        │   ├── ShellChannel.cs     #   Windows ConPTY 本機 Shell
+        │   ├── ShellChannel.cs     #   Windows ConPTY 本機 Shell（StartupDirectory 不存在時 fallback 使用者家目錄）
         │   ├── SessionPage.cs      #   一個分頁 = TerminalView + Channel + 狀態
         │   ├── SessionManager.cs   #   開 / 關 / 列舉所有 active session
         │   ├── SerialBridgeServer.cs# ✅ 本機 named pipe server：把 serial session 的讀寫橋接給 MCP（Phase 9）

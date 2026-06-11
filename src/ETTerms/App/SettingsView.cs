@@ -1,11 +1,10 @@
 using System.Drawing;
 using System.Windows.Forms;
 using ETTerms.Infrastructure;
-using ETTerms.Scripting.Pdu;
 
 namespace ETTerms.App;
 
-/// <summary>Settings page with tabs: Terminal / PDU / AI MCP.</summary>
+/// <summary>Settings page with tabs: Terminal / AI MCP.</summary>
 public sealed class SettingsView : UserControl
 {
     public SettingsView()
@@ -53,7 +52,6 @@ public sealed class SettingsView : UserControl
 
         var termBtn = MakeTab("Terminal", BuildTerminalTab());
         tabBar.Controls.Add(termBtn);
-        tabBar.Controls.Add(MakeTab("PDU", BuildPduTab()));
         tabBar.Controls.Add(MakeTab("AI MCP", BuildAiMcpTab()));
 
         Controls.Add(body);
@@ -171,106 +169,6 @@ public sealed class SettingsView : UserControl
 
         page.Controls.Add(flow);
         return page;
-    }
-
-    // ═══ PDU Tab ═══
-    private Panel BuildPduTab()
-    {
-        var page = new Panel { BackColor = Theme.WorkspaceBack, Padding = new Padding(20) };
-
-        var flow = new FlowLayoutPanel
-        {
-            Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown,
-            WrapContents = false, BackColor = Theme.WorkspaceBack, AutoScroll = true
-        };
-
-        // Connection row
-        var ipBox = new TextBox { Width = 160, Text = "192.168.1.21", BackColor = Theme.TabBack, ForeColor = Theme.Text, Font = Theme.UiFont };
-        var connectBtn = MakeButton("Connect", Theme.SerialColor);
-        var statusLabel = new Label { AutoSize = true, Text = "Disconnected", ForeColor = Theme.TextDim, Font = Theme.UiFont, Margin = new Padding(8, 8, 0, 0) };
-
-        var connRow = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, Width = 500, Height = 36, WrapContents = false, Margin = new Padding(0, 0, 0, 8) };
-        connRow.Controls.Add(new Label { Text = "PDU IP:", AutoSize = true, ForeColor = Theme.Text, Font = Theme.UiFont, Margin = new Padding(0, 6, 8, 0) });
-        connRow.Controls.Add(ipBox);
-        connRow.Controls.Add(connectBtn);
-        connRow.Controls.Add(statusLabel);
-        flow.Controls.Add(connRow);
-
-        // Port status grid
-        var grid = new DataGridView
-        {
-            Width = 480, Height = 310, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
-            BackgroundColor = Theme.WorkspaceBack, ForeColor = Theme.Text, GridColor = Theme.Border,
-            BorderStyle = BorderStyle.None, CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
-            DefaultCellStyle = { BackColor = Theme.TabBack, ForeColor = Theme.Text, SelectionBackColor = Theme.Hover, SelectionForeColor = Theme.Text },
-            ColumnHeadersDefaultCellStyle = { BackColor = Theme.RailBack, ForeColor = Theme.Accent, Font = Theme.UiFontBold },
-            ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single,
-            EnableHeadersVisualStyles = false, RowHeadersVisible = false,
-            AllowUserToAddRows = false, AllowUserToDeleteRows = false, ReadOnly = true,
-            AllowUserToResizeRows = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect,
-            ScrollBars = ScrollBars.None, Font = Theme.UiFont,
-            RowTemplate = { Height = 24 },
-            Margin = new Padding(0, 8, 0, 8)
-        };
-        grid.Columns.Add("Port", "Port");
-        grid.Columns.Add("Status", "Status");
-        grid.Columns.Add("Current", "Current (mA)");
-        grid.Columns.Add("Power", "Power (W)");
-        for (int i = 1; i <= 12; i++)
-            grid.Rows.Add($"Port {i}", "—", "—", "—");
-        flow.Controls.Add(grid);
-
-        // Refresh button
-        var refreshBtn = MakeButton("Refresh", Theme.Accent);
-        flow.Controls.Add(refreshBtn);
-
-        // Logic
-        PduController? pdu = null;
-
-        connectBtn.Click += (_, _) =>
-        {
-            if (pdu != null) { pdu.Dispose(); pdu = null; statusLabel.Text = "Disconnected"; statusLabel.ForeColor = Theme.TextDim; connectBtn.Text = "Connect"; return; }
-            var ip = ipBox.Text.Trim();
-            var p = new PduController(ip);
-            if (p.CheckConnection())
-            {
-                pdu = p;
-                statusLabel.Text = $"Connected to {ip}";
-                statusLabel.ForeColor = Theme.SerialColor;
-                connectBtn.Text = "Disconnect";
-                RefreshPduGrid(pdu, grid);
-            }
-            else
-            {
-                p.Dispose();
-                MessageBox.Show(this, $"Failed to connect to PDU at {ip}", "PDU", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            }
-        };
-
-        refreshBtn.Click += (_, _) =>
-        {
-            if (pdu == null) { MessageBox.Show(this, "Connect to PDU first.", "PDU", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
-            RefreshPduGrid(pdu, grid);
-        };
-
-        page.Controls.Add(flow);
-        return page;
-    }
-
-    private static void RefreshPduGrid(PduController pdu, DataGridView grid)
-    {
-        for (int i = 0; i < 12; i++)
-        {
-            int port = i + 1;
-            var state = pdu.GetPortState(port);
-            var current = pdu.GetPortCurrent(port);
-            var power = pdu.GetPortPowerWatts(port);
-            var row = grid.Rows[i];
-            row.Cells["Status"].Value = state == true ? "ON" : state == false ? "OFF" : "—";
-            row.Cells["Current"].Value = current.HasValue ? $"{current.Value}" : "—";
-            row.Cells["Power"].Value = power.HasValue ? $"{power.Value:F1}" : "—";
-            row.DefaultCellStyle.BackColor = state == true ? Color.FromArgb(40, 80, 40) : state == false ? Color.FromArgb(60, 40, 40) : Theme.TabBack;
-        }
     }
 
     // ═══ AI MCP Tab ═══

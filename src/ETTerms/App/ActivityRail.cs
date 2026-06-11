@@ -10,7 +10,7 @@ namespace ETTerms.App;
 /// </summary>
 public sealed class ActivityRail : UserControl
 {
-    public enum RailView { Terminal, Settings, About }
+    public enum RailView { Terminal, Status, Settings, About }
 
     public event EventHandler<RailView>? ViewSelected;
 
@@ -23,6 +23,7 @@ public sealed class ActivityRail : UserControl
     private static readonly (RailView view, string glyph, string tip)[] Items =
     {
         (RailView.Terminal, "▤", "Terminal"),
+        (RailView.Status, "⚡", "Status"),
         (RailView.Settings, "⚙", "Settings"),
         (RailView.About, "ℹ", "About"),
     };
