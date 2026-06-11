@@ -4,7 +4,7 @@
 
 > A native Windows terminal workspace (C# .NET 8 WinForms) — **SSH**, **Serial Port**, and **local Shell (ConPTY)** in one window, with a **TTL scripting engine** ported from MyTeraTerm for automation, plus an optional **Serial MCP server** that lets AI agents (Kiro CLI / Claude CLI) drive the serial port directly. Standalone, no cloud, no login.
 
-![version](https://img.shields.io/badge/version-0.3.1-blue.svg) ![platform](https://img.shields.io/badge/platform-Windows-0078D6.svg?logo=windows&logoColor=white) ![.NET](https://img.shields.io/badge/.NET-8.0-512BD4.svg?logo=dotnet&logoColor=white) ![UI](https://img.shields.io/badge/UI-WinForms-5C2D91.svg) ![SSH](https://img.shields.io/badge/SSH-SSH.NET-success.svg) ![Serial](https://img.shields.io/badge/Serial-System.IO.Ports-success.svg) ![status](https://img.shields.io/badge/status-beta-yellow.svg) ![license](https://img.shields.io/badge/license-MIT-green.svg)
+![version](https://img.shields.io/badge/version-0.3.2-blue.svg) ![platform](https://img.shields.io/badge/platform-Windows-0078D6.svg?logo=windows&logoColor=white) ![.NET](https://img.shields.io/badge/.NET-8.0-512BD4.svg?logo=dotnet&logoColor=white) ![UI](https://img.shields.io/badge/UI-WinForms-5C2D91.svg) ![SSH](https://img.shields.io/badge/SSH-SSH.NET-success.svg) ![Serial](https://img.shields.io/badge/Serial-System.IO.Ports-success.svg) ![status](https://img.shields.io/badge/status-beta-yellow.svg) ![license](https://img.shields.io/badge/license-MIT-green.svg)
 
 ---
 
@@ -63,6 +63,7 @@
 
 - ⚡ **PDU power control (optional)**
   - Control PDU outlets over SNMP (`SnmpSharpNet`) to power-cycle devices during tests
+  - **Status → PDU** tab: connect to a PDU, auto-poll outlet state every 3 s, and toggle any port on/off with per-row **Control** buttons
   - Script commands: `pduconnect` / `pductrl`
 
 - 🤖 **AI / MCP integration (optional)**
@@ -402,6 +403,11 @@ ETTerms/
 ---
 
 ## 📜 Version History
+
+### v0.3.2
+
+- **Status → PDU tab** — a dedicated `Status` rail view hosts the PDU panel: connect by IP, auto-poll all 12 outlets every 3 s (background thread, no manual Refresh), with live current / power readouts
+- **Manual outlet control buttons** — each row has a **Control** button that toggles that port on/off over SNMP; the label tracks state (ON → "Turn OFF", OFF → "Turn ON"), the SNMP set runs off the UI thread, and the grid refreshes after the command
 
 ### v0.3.1
 

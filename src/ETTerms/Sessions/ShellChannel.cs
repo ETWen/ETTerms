@@ -66,9 +66,12 @@ public sealed class ShellChannel : ISessionChannel
         UpdateProcThreadAttribute(si.lpAttributeList, 0, (IntPtr)0x00020016 /* PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE */,
             _ptyHandle, IntPtr.Size, IntPtr.Zero, IntPtr.Zero);
 
-        string workDir = string.IsNullOrWhiteSpace(_settings.StartupDirectory)
-            ? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
-            : _settings.StartupDirectory;
+        // 啟動目錄：若未設定或該目錄已不存在（例如外接碟拔除、資料夾被刪），
+        // 一律退回目前使用者的家目錄（C:\Users\<user>），避免 CreateProcess 失敗 267 (ERROR_DIRECTORY)。
+        string configured = _settings.StartupDirectory;
+        string workDir = (!string.IsNullOrWhiteSpace(configured) && Directory.Exists(configured))
+            ? configured
+            : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 
         bool ok = CreateProcess(null, $"{exe} {args}".TrimEnd(), IntPtr.Zero, IntPtr.Zero, false,
             0x00080000 /* EXTENDED_STARTUPINFO_PRESENT */, IntPtr.Zero, workDir, ref si, out var pi);

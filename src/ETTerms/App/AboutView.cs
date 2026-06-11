@@ -183,6 +183,13 @@ public sealed class AboutView : UserControl
 
     private static readonly ChangelogEntry[] Changelog =
     [
+        new("0.3.2", new DateOnly(2026, 6, 11), "New Status page — control PDU outlets with buttons",
+        [
+            "New Status page (the ⚡ icon on the left) with a PDU tab — connect to your PDU by IP and see every outlet at a glance.",
+            "Each outlet now has its own on/off button: the button shows \"Turn ON\" or \"Turn OFF\" depending on the current state, so one click flips it.",
+            "Outlet status, current and power refresh automatically every 3 seconds — no need to hit Refresh anymore.",
+            "Fixed: the local Shell no longer fails to start when its saved folder is gone (e.g. an unplugged USB drive); it now falls back to your home folder.",
+        ]),
         new("0.3.1", new DateOnly(2026, 6, 8), "Bugfix — terminal usability",
         [
             "Added a scrollbar on the right of the terminal — just drag it to look back through long output, instead of spinning the mouse wheel for ages.",
