@@ -183,6 +183,11 @@ public sealed class AboutView : UserControl
 
     private static readonly ChangelogEntry[] Changelog =
     [
+        new("0.3.3", new DateOnly(2026, 6, 16), "Bugfix — terminal input no longer dies after activity",
+        [
+            "Fixed: after the terminal had printed output (Serial or PowerShell), switching away and back — minimizing, or clicking another window — left the terminal unable to accept any typing or Enter, forcing you to reopen the session.",
+            "Cause: once enough output scrolled by, the terminal's scrollbar could steal the keyboard focus when the window regained focus. The scrollbar is now mouse-only and never takes focus, so input keeps working.",
+        ]),
         new("0.3.2", new DateOnly(2026, 6, 11), "New Status page — control PDU outlets with buttons",
         [
             "New Status page (the ⚡ icon on the left) with a PDU tab — connect to your PDU by IP and see every outlet at a glance.",
