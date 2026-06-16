@@ -4,7 +4,7 @@
 
 > 原生 Windows 終端機工作台（C# .NET 8 WinForms）—— 一個視窗整合 **SSH**、**Serial Port**、**本機 Shell (ConPTY)** 連線，內建從 MyTeraTerm 移植的 **TTL 腳本引擎**做自動化，並提供選用的 **Serial MCP server**，讓 AI agent（Kiro CLI / Claude CLI）直接操作 serial port。單機、無雲、無登入系統。
 
-![version](https://img.shields.io/badge/version-0.3.2-blue.svg) ![platform](https://img.shields.io/badge/platform-Windows-0078D6.svg?logo=windows&logoColor=white) ![.NET](https://img.shields.io/badge/.NET-8.0-512BD4.svg?logo=dotnet&logoColor=white) ![UI](https://img.shields.io/badge/UI-WinForms-5C2D91.svg) ![SSH](https://img.shields.io/badge/SSH-SSH.NET-success.svg) ![Serial](https://img.shields.io/badge/Serial-System.IO.Ports-success.svg) ![status](https://img.shields.io/badge/status-beta-yellow.svg) ![license](https://img.shields.io/badge/license-MIT-green.svg)
+![version](https://img.shields.io/badge/version-0.3.3-blue.svg) ![platform](https://img.shields.io/badge/platform-Windows-0078D6.svg?logo=windows&logoColor=white) ![.NET](https://img.shields.io/badge/.NET-8.0-512BD4.svg?logo=dotnet&logoColor=white) ![UI](https://img.shields.io/badge/UI-WinForms-5C2D91.svg) ![SSH](https://img.shields.io/badge/SSH-SSH.NET-success.svg) ![Serial](https://img.shields.io/badge/Serial-System.IO.Ports-success.svg) ![status](https://img.shields.io/badge/status-beta-yellow.svg) ![license](https://img.shields.io/badge/license-MIT-green.svg)
 
 ---
 
@@ -403,6 +403,11 @@ ETTerms/
 ---
 
 ## 📜 版本紀錄
+
+### v0.3.3
+
+- **終端機輸入修正** —— 終端機印過輸出後（Serial 或 PowerShell），切走再切回（縮小視窗、或點其他程式）可能導致無法打字或按 **Enter**，只能重開 session；閒置時則不受影響
+- 原因：輸出累積出 scrollback 後，視窗重新取得焦點時終端機捲軸可能搶走鍵盤焦點。捲軸已改為純滑鼠操作、永不吃焦點，無論印出多少都能正常輸入
 
 ### v0.3.2
 
