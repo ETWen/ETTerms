@@ -39,6 +39,11 @@ public sealed class DarkScrollBar : Control
     {
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint
                | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+        // 純滑鼠操作的捲軸，無任何鍵盤邏輯，絕不可吃鍵盤焦點：否則身為唯一可選取子控制項，
+        // 在 scrollback 出現（Enabled=true）後，視窗切走再切回時 WinForms 會把焦點還原到它身上，
+        // 導致 TerminalView 收不到鍵盤輸入（打字 / Enter 全失效），需重開 session 才恢復。
+        SetStyle(ControlStyles.Selectable, false);
+        TabStop = false;
         Width = 12;
         BackColor = TrackColor;
     }
